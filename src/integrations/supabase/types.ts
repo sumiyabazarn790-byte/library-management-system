@@ -14,16 +14,193 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      books: {
+        Row: {
+          author: string
+          available_copies: number
+          cover_url: string | null
+          created_at: string
+          description: string
+          embedding: string | null
+          genre: string
+          id: string
+          language: string
+          title: string
+          total_copies: number
+        }
+        Insert: {
+          author: string
+          available_copies?: number
+          cover_url?: string | null
+          created_at?: string
+          description?: string
+          embedding?: string | null
+          genre: string
+          id?: string
+          language?: string
+          title: string
+          total_copies?: number
+        }
+        Update: {
+          author?: string
+          available_copies?: number
+          cover_url?: string | null
+          created_at?: string
+          description?: string
+          embedding?: string | null
+          genre?: string
+          id?: string
+          language?: string
+          title?: string
+          total_copies?: number
+        }
+        Relationships: []
+      }
+      loans: {
+        Row: {
+          book_id: string
+          due_date: string
+          id: string
+          loaned_at: string
+          returned_at: string | null
+          status: Database["public"]["Enums"]["loan_status"]
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          due_date?: string
+          id?: string
+          loaned_at?: string
+          returned_at?: string | null
+          status?: Database["public"]["Enums"]["loan_status"]
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          due_date?: string
+          id?: string
+          loaned_at?: string
+          returned_at?: string | null
+          status?: Database["public"]["Enums"]["loan_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loans_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          preferred_genres: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id: string
+          preferred_genres?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          preferred_genres?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      borrow_book: {
+        Args: { p_book_id: string }
+        Returns: {
+          book_id: string
+          due_date: string
+          id: string
+          loaned_at: string
+          returned_at: string | null
+          status: Database["public"]["Enums"]["loan_status"]
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "loans"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      match_books: {
+        Args: { match_count?: number; query_embedding: string }
+        Returns: {
+          author: string
+          available_copies: number
+          cover_url: string
+          description: string
+          genre: string
+          id: string
+          language: string
+          similarity: number
+          title: string
+          total_copies: number
+        }[]
+      }
+      return_book: {
+        Args: { p_loan_id: string }
+        Returns: {
+          book_id: string
+          due_date: string
+          id: string
+          loaned_at: string
+          returned_at: string | null
+          status: Database["public"]["Enums"]["loan_status"]
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "loans"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      search_books_fuzzy: {
+        Args: { lim?: number; q: string }
+        Returns: {
+          author: string
+          available_copies: number
+          cover_url: string | null
+          created_at: string
+          description: string
+          embedding: string | null
+          genre: string
+          id: string
+          language: string
+          title: string
+          total_copies: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "books"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
-      [_ in never]: never
+      loan_status: "requested" | "active" | "returned" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +327,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      loan_status: ["requested", "active", "returned", "cancelled"],
+    },
   },
 } as const
