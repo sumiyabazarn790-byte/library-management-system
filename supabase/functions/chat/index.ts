@@ -11,17 +11,17 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const SYSTEM_PROMPT = `You are Aetheria, an erudite multilingual librarian for a digital archive.
-You speak fluently in Mongolian (Cyrillic) AND English. Detect the user's language and respond in the same language.
+You speak fluently in Mongolian (Cyrillic) AND English. ALWAYS detect the user's language and respond in the same language.
 
 You help readers:
-- discover books (semantic + keyword + fuzzy search)
+- discover books (semantic, keyword, fuzzy/typo-tolerant search)
 - borrow and return books
 - check personal loans
 - get personalized recommendations based on preferred genres
 - answer general knowledge & literary questions
 
-When recommending books from the catalog, include the book TITLE in **bold**.
-Be warm, concise, cinematic. Never invent books that are not in context. If catalog context is provided, prefer those.`;
+When recommending books from the catalog context, include the book TITLE in **bold** with the author.
+Be warm, concise, cinematic. Never invent books that are not in the provided context — if no catalog matches, say so.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -30,36 +30,29 @@ serve(async (req) => {
     const { messages } = await req.json();
     const lastUser = [...messages].reverse().find((m: any) => m.role === "user")?.content ?? "";
 
-    // 1) Build embedding for the user's last query (semantic context)
+    // Build catalog context using the search-books fuzzy expansion logic inline
     let context = "";
     try {
-      const embRes = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "google/text-embedding-004", input: lastUser }),
-      });
-      if (embRes.ok) {
-        const embJson = await embRes.json();
-        const embedding = embJson.data?.[0]?.embedding;
-        if (embedding) {
-          const supa = createClient(SUPABASE_URL, SERVICE_ROLE);
-          const { data: matches } = await supa.rpc("match_books", {
-            query_embedding: embedding,
-            match_count: 5,
-          });
-          if (matches?.length) {
-            context = "Relevant books in the catalogue:\n" +
-              matches.map((b: any, i: number) =>
-                `${i + 1}. "${b.title}" — ${b.author} [${b.genre}, ${b.language}] — ${b.description} (available: ${b.available_copies}/${b.total_copies})`,
-              ).join("\n");
-          }
-        }
+      const supa = createClient(SUPABASE_URL, SERVICE_ROLE);
+      const { data: matches } = await supa.rpc("search_books_fuzzy", { q: lastUser, lim: 8 });
+      let books = matches ?? [];
+      // If thin, also pull a small recent-popular slice
+      if (books.length < 4) {
+        const { data: extra } = await supa.from("books").select("*").limit(8);
+        const seen = new Set(books.map((b: any) => b.id));
+        for (const b of extra ?? []) if (!seen.has(b.id)) books.push(b);
+      }
+      if (books.length) {
+        context = "Available books in the Aetheria catalog (use these when recommending):\n" +
+          books.slice(0, 10).map((b: any, i: number) =>
+            `${i + 1}. "${b.title}" — ${b.author} [${b.genre}, ${b.language}] — ${b.description} (${b.available_copies}/${b.total_copies} available)`,
+          ).join("\n");
       }
     } catch (e) {
-      console.warn("embedding/context failed", e);
+      console.warn("context build failed", e);
     }
 
-    const systemMessages = [{ role: "system", content: SYSTEM_PROMPT }];
+    const systemMessages: any[] = [{ role: "system", content: SYSTEM_PROMPT }];
     if (context) systemMessages.push({ role: "system", content: context });
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -79,7 +72,7 @@ serve(async (req) => {
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI кредит дууссан байна. Workspace Settings → Usage руу оруулна уу." }), {
+        return new Response(JSON.stringify({ error: "AI кредит дууссан. Workspace Settings → Usage руу нэмнэ үү." }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
