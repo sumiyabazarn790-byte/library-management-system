@@ -1,17 +1,23 @@
 import { Search, Bell, LogOut, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const links = ["Home", "Browse", "Library", "Collections", "AI Insights"];
 
 export const TopNav = () => {
   const { user, signOut } = useAuth();
+  const nav = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    nav("/", { replace: true });
+  };
 
   return (
     <header className="fixed top-0 inset-x-0 z-50 glass-strong">
       <nav className="max-w-[1440px] mx-auto flex items-center justify-between px-6 lg:px-12 h-16">
         <div className="flex items-center gap-12">
-          <Link to="/" className="font-display font-bold tracking-tight text-lg text-gradient-accent">
+          <Link to="/app" className="font-display font-bold tracking-tight text-lg text-gradient-accent">
             AETHERIA
           </Link>
           <ul className="hidden md:flex items-center gap-8 text-label text-muted-foreground">
@@ -33,7 +39,7 @@ export const TopNav = () => {
           </button>
           {user ? (
             <button
-              onClick={signOut}
+              onClick={handleSignOut}
               className="ml-2 inline-flex items-center gap-2 h-9 px-3 rounded-md bg-surface-high text-foreground text-xs font-semibold ring-hairline hover:bg-surface-elevated transition-colors"
               aria-label="Sign out"
             >
