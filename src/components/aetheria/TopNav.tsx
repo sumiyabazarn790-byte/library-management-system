@@ -11,7 +11,7 @@ export const TopNav = () => {
     <header className="fixed top-0 inset-x-0 z-50 glass-strong">
       <nav className="max-w-[1440px] mx-auto flex items-center justify-between px-6 lg:px-12 h-16">
         <div className="flex items-center gap-12">
-          <Link to="/" className="font-display font-bold tracking-tight text-lg text-gradient-accent">
+          <Link to="/app" className="font-display font-bold tracking-tight text-lg text-gradient-accent">
             AETHERIA
           </Link>
           <ul className="hidden md:flex items-center gap-8 text-label text-muted-foreground">

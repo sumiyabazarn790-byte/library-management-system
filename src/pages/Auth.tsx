@@ -14,7 +14,7 @@ const Auth = () => {
   const [busy, setBusy] = useState(false);
 
   if (user) {
-    nav("/", { replace: true });
+    nav("/app", { replace: true });
     return null;
   }
 
@@ -34,7 +34,7 @@ const Auth = () => {
     } else {
       toast.success("Тавтай морил.");
     }
-    nav("/", { replace: true });
+    nav("/app", { replace: true });
   };
 
   return (
