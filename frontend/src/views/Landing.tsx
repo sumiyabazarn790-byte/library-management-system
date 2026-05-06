@@ -74,7 +74,7 @@ const Landing = () => {
       <section className="relative pt-32 pb-24 md:pt-40 md:pb-32">
         <div className="absolute inset-0 -z-10">
           <img
-            src={landingHero}
+            src={landingHero.src}
             alt="Cosmic library backdrop"
             className="h-full w-full object-cover opacity-50"
             width={1920}
@@ -122,14 +122,14 @@ const Landing = () => {
           <div className="relative mx-auto max-w-3xl">
             <div className="absolute -inset-12 bg-gradient-accent opacity-20 blur-3xl rounded-full" />
             <div className="relative grid grid-cols-3 gap-6">
-              {[bookCodex, bookNeural, bookCandle].map((src, i) => (
+              {[bookCodex, bookNeural, bookCandle].map((image, i) => (
                 <div
                   key={i}
                   className={`relative aspect-[2/3] rounded-lg overflow-hidden ring-hairline-strong shadow-cinematic ${
                     i === 1 ? "translate-y-[-20px] animate-float" : i === 0 ? "rotate-[-4deg]" : "rotate-[4deg]"
                   }`}
                 >
-                  <img src={src} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  <img src={image.src} alt="" className="h-full w-full object-cover" loading="lazy" />
                   <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
                 </div>
               ))}
