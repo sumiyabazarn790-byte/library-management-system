@@ -1,0 +1,53 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="aetheria-arch" x1="44" y1="28" x2="220" y2="196" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#66D9FF"/>
+      <stop offset="0.52" stop-color="#D7BCFF"/>
+      <stop offset="1" stop-color="#FFD9A3"/>
+    </linearGradient>
+    <linearGradient id="aetheria-page" x1="54" y1="92" x2="202" y2="228" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFD9A3"/>
+      <stop offset="0.42" stop-color="#FFF0D5"/>
+      <stop offset="1" stop-color="#66D9FF"/>
+    </linearGradient>
+    <filter id="aetheria-glow" x="20" y="8" width="216" height="240" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feGaussianBlur stdDeviation="4" result="effect1_foregroundBlur"/>
+    </filter>
+  </defs>
+  <g filter="url(#aetheria-glow)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M42 184V88C42 45 78 18 128 18C178 18 214 45 214 88V184" stroke="url(#aetheria-arch)" stroke-width="12"/>
+    <path d="M128 58V34" stroke="#FFD9A3" stroke-width="8"/>
+    <path d="M126 54C100 54 81 47 66 30" stroke="#66D9FF" stroke-width="6" opacity="0.95"/>
+    <path d="M130 54C156 54 175 47 190 30" stroke="#FFD9A3" stroke-width="6" opacity="0.95"/>
+    <path d="M122 78C95 78 73 88 58 108" stroke="#66D9FF" stroke-width="6" opacity="0.88"/>
+    <path d="M134 78C161 78 183 88 198 108" stroke="#D7BCFF" stroke-width="6" opacity="0.9"/>
+    <path d="M118 102C96 102 78 111 66 126" stroke="#66D9FF" stroke-width="6" opacity="0.75"/>
+    <path d="M138 102C160 102 178 111 190 126" stroke="#FFD9A3" stroke-width="6" opacity="0.8"/>
+    <circle cx="96" cy="46" r="5" fill="#66D9FF"/>
+    <circle cx="82" cy="78" r="5" fill="#66D9FF"/>
+    <circle cx="70" cy="108" r="5" fill="#66D9FF"/>
+    <circle cx="160" cy="46" r="5" fill="#FFD9A3"/>
+    <circle cx="174" cy="78" r="5" fill="#D7BCFF"/>
+    <circle cx="186" cy="108" r="5" fill="#FFD9A3"/>
+    <path d="M128 124C109 105 84 96 56 96V204C86 204 108 212 128 230" stroke="url(#aetheria-page)" stroke-width="10"/>
+    <path d="M128 124C147 105 172 96 200 96V204C170 204 148 212 128 230" stroke="url(#aetheria-page)" stroke-width="10"/>
+    <path d="M128 124V228" stroke="url(#aetheria-page)" stroke-width="10"/>
+    <path d="M94 136V150L78 162V188" stroke="#FFD9A3" stroke-width="6"/>
+    <path d="M104 152L122 164" stroke="#FFD9A3" stroke-width="6"/>
+    <path d="M94 174L120 190" stroke="#FFD9A3" stroke-width="6"/>
+    <path d="M84 194C98 196 111 201 122 210" stroke="#FFD9A3" stroke-width="6"/>
+    <circle cx="94" cy="136" r="5" fill="#FFD9A3"/>
+    <circle cx="78" cy="188" r="5" fill="#FFD9A3"/>
+    <path d="M162 136V150L178 162V188" stroke="#66D9FF" stroke-width="6"/>
+    <path d="M152 152L134 164" stroke="#66D9FF" stroke-width="6"/>
+    <path d="M162 174L136 190" stroke="#66D9FF" stroke-width="6"/>
+    <path d="M172 194C158 196 145 201 134 210" stroke="#66D9FF" stroke-width="6"/>
+    <circle cx="162" cy="136" r="5" fill="#66D9FF"/>
+    <circle cx="178" cy="188" r="5" fill="#66D9FF"/>
+    <path d="M52 208C81 208 107 215 128 236" stroke="#66D9FF" stroke-width="8" opacity="0.9"/>
+    <path d="M204 208C175 208 149 215 128 236" stroke="#FFD9A3" stroke-width="8" opacity="0.92"/>
+    <circle cx="128" cy="232" r="10" fill="url(#aetheria-page)"/>
+  </g>
+</svg>

@@ -1,0 +1,164 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Aetheria design system. All colors HSL. */
+
+@layer base {
+  :root {
+    --background: 200 17% 7%;
+    --foreground: 200 11% 89%;
+
+    --surface: 200 17% 7%;
+    --surface-low: 207 14% 11%;
+    --surface-elevated: 207 12% 13%;
+    --surface-high: 207 9% 17%;
+
+    --card: 207 12% 13%;
+    --card-foreground: 200 11% 89%;
+
+    --popover: 207 12% 13%;
+    --popover-foreground: 200 11% 89%;
+
+    --primary: 195 100% 69%;
+    --primary-foreground: 198 100% 14%;
+    --primary-glow: 195 100% 75%;
+
+    --secondary: 261 100% 87%;
+    --secondary-foreground: 261 81% 29%;
+    --secondary-deep: 261 53% 40%;
+
+    --muted: 207 9% 17%;
+    --muted-foreground: 207 14% 78%;
+
+    --accent: 35 100% 82%;
+    --accent-foreground: 35 100% 14%;
+
+    --destructive: 4 100% 84%;
+    --destructive-foreground: 358 100% 21%;
+
+    --border: 207 13% 27%;
+    --input: 207 13% 27%;
+    --ring: 195 100% 69%;
+
+    --radius: 0.5rem;
+
+    --gradient-accent: linear-gradient(135deg, hsl(195 100% 69%), hsl(261 70% 70%));
+    --gradient-hero: linear-gradient(180deg, transparent 0%, hsl(200 17% 7% / 0.4) 50%, hsl(200 17% 7%) 100%);
+    --gradient-card-fade: linear-gradient(180deg, transparent 40%, hsl(200 17% 7% / 0.95) 100%);
+
+    --glow-primary: 0 0 40px hsl(195 100% 69% / 0.35);
+    --glow-secondary: 0 0 60px hsl(261 70% 65% / 0.3);
+    --glow-soft: 0 0 80px hsl(195 100% 69% / 0.15);
+
+    --shadow-cinematic: 0 30px 80px -20px hsl(0 0% 0% / 0.6);
+    --shadow-card: 0 8px 32px -8px hsl(0 0% 0% / 0.5);
+
+    --transition-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply bg-background;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-manrope), system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-space-grotesk), sans-serif;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-space-grotesk), sans-serif;
+  }
+
+  .text-hero {
+    font-family: var(--font-space-grotesk), sans-serif;
+    font-size: clamp(2.5rem, 6vw, 5.25rem);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.04em;
+  }
+
+  .text-headline-lg {
+    font-family: var(--font-space-grotesk), sans-serif;
+    font-size: clamp(1.75rem, 3vw, 3rem);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+
+  .text-headline-md {
+    font-family: var(--font-space-grotesk), sans-serif;
+    font-size: clamp(1.375rem, 2vw, 2rem);
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+
+  .text-label {
+    font-family: var(--font-manrope), sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .glass {
+    background: hsl(207 12% 13% / 0.55);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid hsl(0 0% 100% / 0.06);
+  }
+
+  .glass-strong {
+    background: hsl(207 12% 13% / 0.78);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid hsl(0 0% 100% / 0.08);
+  }
+
+  .text-gradient-accent {
+    background: var(--gradient-accent);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .glow-primary {
+    box-shadow: var(--glow-primary);
+  }
+
+  .ring-hairline {
+    box-shadow: inset 0 0 0 1px hsl(0 0% 100% / 0.06);
+  }
+
+  .ring-hairline-strong {
+    box-shadow: inset 0 0 0 1px hsl(0 0% 100% / 0.12);
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+}

@@ -1,24 +1,33 @@
+node_modules
+frontend/.next
+frontend/.next-dev
+frontend/tsconfig.tsbuildinfo
+frontend/.next-*.log
+
+# Environment files
+.env
+*.local
+frontend/.env.local
+backend/.env
+
+# Editor and local tooling
+.vscode/
+.idea/
+.chrome-headless/
+
+# Supabase local state
+backend/supabase/.temp/
+backend/supabase/.branches/
+supabase/.temp/
+supabase/.branches/
+
 # Logs
-logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# Python cache
+__pycache__/
+*.pyc
