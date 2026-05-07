@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   clearPersistedSupabaseSession,
   getSupabaseUnavailableReason,
+  SUPABASE_AVAILABILITY_CHANGE_EVENT,
 } from "@/integrations/supabase/availability";
 import { buildAuthRedirectUrl } from "@/lib/auth";
 import type { Profile } from "@/types/library";
@@ -94,7 +95,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authUnavailableMessage] = useState<string | null>(() => getSupabaseUnavailableReason());
+  const [authUnavailableMessage, setAuthUnavailableMessage] = useState<string | null>(() => getSupabaseUnavailableReason());
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleAvailabilityChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ reason?: string | null }>;
+      setAuthUnavailableMessage(customEvent.detail?.reason ?? getSupabaseUnavailableReason());
+    };
+
+    window.addEventListener(SUPABASE_AVAILABILITY_CHANGE_EVENT, handleAvailabilityChange);
+    return () => {
+      window.removeEventListener(SUPABASE_AVAILABILITY_CHANGE_EVENT, handleAvailabilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (authUnavailableMessage) {

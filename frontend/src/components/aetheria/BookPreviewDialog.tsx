@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getBookCover } from "@/lib/bookCovers";
-import { buildReadingSections, canReadBookNow, getBookReaderPath } from "@/lib/library";
+import { buildReadingSections, canReadBookNow, getBookReaderPath, isUuid } from "@/lib/library";
 import type { Book, LoanStatus } from "@/types/library";
 
 type BookPreviewDialogProps = {
@@ -37,6 +37,7 @@ export const BookPreviewDialog = ({
 }: BookPreviewDialogProps) => {
   const previewSections = buildReadingSections(book).slice(0, 3);
   const canReadImmediately = canReadBookNow(book);
+  const hasCanonicalBookId = isUuid(book.id);
   const statusLabel = getStatusLabel(loanStatus);
 
   return (
@@ -88,7 +89,7 @@ export const BookPreviewDialog = ({
             <div className="mt-4 flex flex-wrap gap-2 text-xs">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-primary">
                 <BookOpen className="size-3.5" />
-                {canReadImmediately ? "Shuud unshij bolno" : "Zeelej baij unshina"}
+                {canReadImmediately ? "Shuud unshij bolno" : hasCanonicalBookId ? "Zeelej baij unshina" : "Preview-only catalog"}
               </span>
               {statusLabel ? (
                 <span className="inline-flex rounded-full bg-secondary-deep/30 px-3 py-1 text-secondary">
@@ -96,7 +97,7 @@ export const BookPreviewDialog = ({
                 </span>
               ) : null}
               <span className="inline-flex rounded-full bg-surface-high px-3 py-1 text-muted-foreground">
-                {canReadImmediately ? "Free read" : "Free borrow"}
+                {canReadImmediately ? "Free read" : hasCanonicalBookId ? "Library borrow" : "Preview only"}
               </span>
             </div>
 
@@ -117,6 +118,8 @@ export const BookPreviewDialog = ({
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {canReadImmediately
                   ? "This title is public-readable, so you can open it instantly from the catalog without borrowing first."
+                  : !hasCanonicalBookId
+                    ? "This title is currently shown as a local preview card only. Borrow and save actions are disabled until it is added to the database catalog."
                   : book.available_copies > 0
                     ? "This title can be borrowed for free from the catalog."
                     : "This title is currently unavailable, so you can place a free request and borrow it once a copy returns."}

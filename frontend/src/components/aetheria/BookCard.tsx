@@ -8,6 +8,7 @@ import { getBookCover } from "@/lib/bookCovers";
 import {
   canReadBookNow,
   getBookReaderPath,
+  isUuid,
   removeSavedBookForUser,
   resolveBookId,
   saveBookForUser,
@@ -33,19 +34,26 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
   const staleBorrowSessionPattern = /loans_user_id_fkey|violates foreign key constraint ["']loans_user_id_fkey["']/i;
 
   const canReadFree = canReadBookNow(book);
+  const hasCanonicalBookId = isUuid(book.id);
   const isActive = loanStatus === "active";
   const isRequested = loanStatus === "requested";
 
   const primaryLabel = useMemo(() => {
     if (canReadFree) return "Read on site";
+    if (!hasCanonicalBookId) return "Preview only";
     if (isActive) return "Borrowed";
     if (isRequested) return "Requested";
     return book.available_copies > 0 ? "Borrow" : "Request";
-  }, [book.available_copies, canReadFree, isActive, isRequested]);
+  }, [book.available_copies, canReadFree, hasCanonicalBookId, isActive, isRequested]);
 
   const completeBorrowFlow = async (borrowMode: "borrow" | "request") => {
     if (!user) {
       navigate("/auth");
+      return false;
+    }
+
+    if (!hasCanonicalBookId) {
+      toast.message("Ene preview nom local catalog-d l baina. Database-d burtgeltei huvilbar deer borrow hiih bolno.");
       return false;
     }
 
@@ -115,6 +123,11 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
       return;
     }
 
+    if (!hasCanonicalBookId) {
+      toast.message("Ene preview nom local catalog-d l baina. Database-d burtgeltei nomuudiig save hiij bolno.");
+      return;
+    }
+
     setSaveBusy(true);
 
     try {
@@ -163,15 +176,19 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
           }}
         />
         <div className="absolute inset-0 bg-gradient-card-fade" />
-        <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-          <span className="rounded-full glass px-2.5 py-1 text-label text-foreground/90">{book.genre}</span>
+        <div className="absolute left-2.5 top-2.5 flex max-w-[calc(100%-3.5rem)] flex-wrap gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
+          <span className="max-w-full truncate rounded-full glass px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground/90 sm:px-2.5 sm:text-label">
+            {book.genre}
+          </span>
           {canReadFree ? (
-            <span className="rounded-full bg-secondary-deep/70 px-2.5 py-1 text-label text-secondary">Free read</span>
+            <span className="rounded-full bg-secondary-deep/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-secondary sm:px-2.5 sm:text-label">
+              Free read
+            </span>
           ) : null}
         </div>
-        <div className="absolute right-3 top-3">
+        <div className="absolute right-2.5 top-2.5 sm:right-3 sm:top-3">
           <span
-            className={`rounded-full px-2.5 py-1 text-label ${
+            className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] sm:px-2.5 sm:text-label ${
               book.language === "mn" ? "bg-secondary-deep/60 text-secondary" : "bg-primary/15 text-primary"
             }`}
           >
@@ -180,20 +197,22 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col p-3 sm:p-4">
-        <h3 className="line-clamp-2 font-display font-semibold leading-tight">{book.title}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">{book.author}</p>
-        <p className="mt-3 flex-1 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground/80">
+      <div className="flex flex-1 flex-col p-2.5 sm:p-4">
+        <h3 className="min-h-[2.45rem] text-[15px] font-display font-semibold leading-tight sm:min-h-0 sm:text-base">
+          <span className="line-clamp-2">{book.title}</span>
+        </h3>
+        <p className="mt-1 line-clamp-1 text-[12px] text-muted-foreground sm:text-sm">{book.author}</p>
+        <p className="mt-2 flex-1 line-clamp-2 text-[12px] leading-5 text-muted-foreground/80 sm:mt-3 sm:text-[13px] sm:leading-relaxed">
           {book.description}
         </p>
 
-        <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="mt-3 flex items-center justify-between gap-2 sm:mt-4 sm:gap-3">
           <div className="space-y-1">
-            <span className="block text-label text-muted-foreground">
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground sm:text-label">
               {book.available_copies}/{book.total_copies} available
             </span>
           </div>
-          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/80">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/80 sm:text-[11px] sm:tracking-[0.18em]">
             {canReadFree ? "Read now" : "Preview"}
           </span>
         </div>
@@ -202,7 +221,7 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
   );
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-xl bg-surface-elevated/50 ring-hairline transition-all hover:-translate-y-1 hover:bg-surface-high/50 hover:shadow-cinematic hover:ring-hairline-strong">
+    <article className="group flex flex-col overflow-hidden rounded-[18px] bg-surface-elevated/50 ring-hairline transition-all hover:-translate-y-1 hover:bg-surface-high/50 hover:shadow-cinematic hover:ring-hairline-strong sm:rounded-xl">
       {canReadFree ? (
         <BookReaderDialog book={book} index={index}>
           {cardTrigger}
@@ -213,13 +232,13 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
         </BookPreviewDialog>
       )}
 
-      <div className="px-3 pb-3 sm:px-4 sm:pb-4">
-        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+      <div className="px-2.5 pb-2.5 sm:px-4 sm:pb-4">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           <button
             type="button"
             onClick={() => void handleSaveToggle()}
-            disabled={saveBusy}
-            className={`inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border px-3.5 text-xs font-semibold transition-colors sm:w-auto ${
+            disabled={saveBusy || !hasCanonicalBookId}
+            className={`inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold transition-colors sm:h-9 sm:w-auto sm:px-3.5 sm:text-xs ${
               isSaved
                 ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
                 : "border-border/70 text-muted-foreground hover:bg-surface-high hover:text-foreground"
@@ -233,7 +252,7 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
             <BookPreviewDialog book={book} index={index} loanStatus={loanStatus}>
               <button
                 type="button"
-                className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-secondary/40 px-3.5 text-xs font-semibold text-secondary transition-colors hover:bg-secondary-deep/30 sm:w-auto"
+                className="hidden h-9 items-center justify-center gap-1.5 rounded-md border border-secondary/40 px-3.5 text-xs font-semibold text-secondary transition-colors hover:bg-secondary-deep/30 sm:inline-flex"
               >
                 <BookOpen className="size-3.5" />
                 Details
@@ -243,7 +262,7 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
             <BookPreviewDialog book={book} index={index} loanStatus={loanStatus}>
               <button
                 type="button"
-                className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-primary/30 px-3.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 sm:w-auto"
+                className="hidden h-9 items-center justify-center gap-1.5 rounded-md border border-primary/30 px-3.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 sm:inline-flex"
               >
                 <BookOpen className="size-3.5" />
                 Preview
@@ -254,7 +273,7 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
           {canReadFree ? (
             <Link
               to={getBookReaderPath(book)}
-              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_40px_hsl(var(--primary)/0.5)] sm:w-auto"
+              className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_40px_hsl(var(--primary)/0.5)] sm:h-9 sm:w-auto sm:px-3.5 sm:text-xs"
             >
               <BookOpen className="size-3.5" />
               {primaryLabel}
@@ -263,8 +282,8 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
             <button
               type="button"
               onClick={() => void handlePrimaryAction()}
-              disabled={busy || isActive || isRequested}
-              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_40px_hsl(var(--primary)/0.5)] disabled:opacity-50 disabled:shadow-none sm:w-auto"
+              disabled={busy || isActive || isRequested || !hasCanonicalBookId}
+              className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_40px_hsl(var(--primary)/0.5)] disabled:opacity-50 disabled:shadow-none sm:h-9 sm:w-auto sm:px-3.5 sm:text-xs"
             >
               {busy ? <Loader2 className="size-3.5 animate-spin" /> : <BookOpen className="size-3.5" />}
               {primaryLabel}

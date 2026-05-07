@@ -40,7 +40,7 @@ describe("Auth", () => {
     render(<Auth />);
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith({ pathname: "/", hash: "#browse" }, { replace: true });
+      expect(navigateMock).toHaveBeenCalledWith({ pathname: "/app", hash: "#browse" }, { replace: true });
     });
   });
 });

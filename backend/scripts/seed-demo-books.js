@@ -29,7 +29,7 @@ if (result.error) {
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 // Seeding хийхэд Service Role Key ашиглах нь RLS дүрмийг алгасах боломжийг олгоно
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+const SERVICE_ROLE_KEY = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)?.trim();
 const ANON_KEY = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)?.trim();
 const SUPABASE_KEY = SERVICE_ROLE_KEY || ANON_KEY;
 

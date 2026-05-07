@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { primeSupabaseAvailability } from "@/integrations/supabase/availability";
-import App from "../src/App";
 
 export function ClientOnlyApp() {
-  const [ready, setReady] = useState(false);
+  const [AppComponent, setAppComponent] = useState<ComponentType | null>(null);
+  const [bootError, setBootError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -13,11 +13,15 @@ export function ClientOnlyApp() {
     const load = async () => {
       try {
         await primeSupabaseAvailability();
+        const { default: LoadedApp } = await import("../src/App");
+        if (active) {
+          setAppComponent(() => LoadedApp);
+        }
       } catch (error) {
-        console.error("Failed to prime Supabase:", error);
-      }
-      if (active) {
-        setReady(true);
+        console.error("Failed to boot client app:", error);
+        if (active) {
+          setBootError("Failed to load the app. Please refresh and try again.");
+        }
       }
     };
 
@@ -28,13 +32,14 @@ export function ClientOnlyApp() {
     };
   }, []);
 
-  if (!ready) {
+  if (!AppComponent) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center">
+      <div className="flex h-screen w-screen flex-col items-center justify-center gap-3 px-6 text-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        {bootError ? <p className="max-w-md text-sm text-muted-foreground">{bootError}</p> : null}
       </div>
     );
   }
 
-  return <App />;
+  return <AppComponent />;
 }

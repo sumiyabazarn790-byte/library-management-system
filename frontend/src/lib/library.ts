@@ -150,18 +150,6 @@ export const searchBooks = async (query: string, limit = 16): Promise<Book[]> =>
       if (error) throw error;
 
       const books = (data ?? []) as Book[];
-      if (books.length > 0) {
-        if (isLoopbackSupabaseUrl) {
-          return mergeBooks(books, filterFallbackBooks(normalized, limit), limit);
-        }
-
-        return books;
-      }
-
-      if (isLoopbackSupabaseUrl) {
-        return filterFallbackBooks(normalized, limit);
-      }
-
       return books;
     } catch (error) {
       if (isRecoverableLibraryError(error)) {
@@ -193,18 +181,6 @@ export const searchBooks = async (query: string, limit = 16): Promise<Book[]> =>
     if (error) throw error;
 
     const books = (data ?? []) as Book[];
-    if (books.length > 0) {
-      if (isLoopbackSupabaseUrl) {
-        return mergeBooks(books, filterFallbackBooks(normalized, limit), limit);
-      }
-
-      return books;
-    }
-
-    if (isLoopbackSupabaseUrl) {
-      return filterFallbackBooks(normalized, limit);
-    }
-
     return books;
   } catch (error) {
     if (isRecoverableLibraryError(error)) {
@@ -290,18 +266,6 @@ export const fetchPublicReadableBooks = async (limit = 8): Promise<Book[]> => {
     if (error) throw error;
 
     const books = ((data ?? []) as Book[]).filter((book) => canReadBookNow(book)).slice(0, limit);
-    if (books.length > 0) {
-      if (isLoopbackSupabaseUrl) {
-        return mergeBooks(books, filterFallbackBooks("", limit, true), limit);
-      }
-
-      return books;
-    }
-
-    if (isLoopbackSupabaseUrl) {
-      return filterFallbackBooks("", limit, true);
-    }
-
     return books;
   } catch (error) {
     if (isRecoverableLibraryError(error)) {

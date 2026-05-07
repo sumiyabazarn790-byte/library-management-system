@@ -58,13 +58,13 @@ Deno.serve(async (req) => {
   try {
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const serviceRole = Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!lovableApiKey || !supabaseUrl || !serviceRole) {
       return jsonResponse(
         {
           error:
-            "Chat function is missing required server secrets. Set LOVABLE_API_KEY, SUPABASE_URL, and SUPABASE_SERVICE_ROLE_KEY before invoking AI chat.",
+            "Chat function is missing required server secrets. Set LOVABLE_API_KEY, SUPABASE_URL, and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) before invoking AI chat.",
         },
         { status: 500 },
       );

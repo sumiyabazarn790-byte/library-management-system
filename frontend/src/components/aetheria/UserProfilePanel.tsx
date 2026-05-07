@@ -418,7 +418,7 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
                   Book card deer `Save` darsnaar end tani hadgalsan nomnuud shuud garj irne.
                 </p>
               ) : (
-                <div className="mt-6 grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
+                <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-5 2xl:grid-cols-3">
                   {savedBooks.map((entry, index) => (
                     <BookCard
                       key={entry.id}

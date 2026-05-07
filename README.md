@@ -40,6 +40,8 @@ The demo data includes:
 Notes:
 
 - Frontend env values live in `frontend/.env.local`.
+- For Vercel deployments, also set `NEXT_PUBLIC_SUPABASE_URL` and a public Supabase key in Project Settings -> Environment Variables.
+- Preferred key name is `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; `NEXT_PUBLIC_SUPABASE_ANON_KEY` is still accepted as a legacy fallback.
 - Frontend-only QPay branding can be added to `frontend/.env.local`:
   `NEXT_PUBLIC_QPAY_MERCHANT_NAME=Aetheria Library`
 - For a static local QR image instead of real invoice generation, set

@@ -9,7 +9,7 @@ const getEnv = (name: string) => process.env[name]?.trim() || "";
 const getSupabaseConfig = () => {
   const url = getEnv("NEXT_PUBLIC_SUPABASE_URL");
   const anonKey = getEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") || getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  const serviceRoleKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const serviceRoleKey = getEnv("SUPABASE_SECRET_KEY") || getEnv("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!url || !anonKey || !serviceRoleKey) {
     throw new Error("Missing Supabase configuration for secure downloads.");

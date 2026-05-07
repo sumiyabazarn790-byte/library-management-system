@@ -52,7 +52,7 @@ export const MyLoans = ({
       setLoading(true);
 
       try {
-        const loanData = await fetchLoans(user.id);
+        const loanData = await fetchLoans(user.id, { statuses: ["active", "requested"] });
         const listingData = saleListingsFeatureEnabled
           ? await fetchSaleListings(user.id).catch((error) => {
               console.warn("sale listings load skipped", error);
@@ -94,6 +94,7 @@ export const MyLoans = ({
     }
 
     toast.success("Ном амжилттай буцаагдлаа.");
+    setLoans((current) => current.filter((loan) => loan.id !== loanId));
     onLibraryChange?.();
   };
 
