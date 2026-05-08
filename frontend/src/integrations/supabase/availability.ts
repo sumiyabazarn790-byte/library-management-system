@@ -1,19 +1,36 @@
-import { SUPABASE_PUBLIC_KEY_ENV_LABEL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./config";
+import {
+  isLoopbackHostname,
+  SUPABASE_PUBLIC_KEY_ENV_LABEL,
+  SUPABASE_PUBLISHABLE_KEY,
+  SUPABASE_URL,
+  SUPABASE_URL_IS_LOOPBACK,
+} from "./config";
 
-const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const UNAVAILABLE_FLAG_KEY = "lumina.supabase.loopback.unavailable";
 export const SUPABASE_AVAILABILITY_CHANGE_EVENT = "lumina:supabase-availability-change";
 
 export const LOCAL_SUPABASE_UNAVAILABLE_MESSAGE =
   "Local Supabase backend is not running. Start Docker Desktop, run `supabase start --workdir backend`, or update frontend/.env.local with your cloud project URL and publishable key.";
+export const DEPLOYED_LOOPBACK_SUPABASE_MESSAGE =
+  "This deployed app is still pointing at a local Supabase URL. In Render or Vercel, set NEXT_PUBLIC_SUPABASE_URL to your cloud Supabase project URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to your public key, then redeploy.";
 export const CLOUD_SUPABASE_UNAVAILABLE_MESSAGE =
   "Supabase project URL could not be reached. Check NEXT_PUBLIC_SUPABASE_URL, confirm the project still exists, or switch frontend/.env.local to your local Supabase URL.";
 export const MISSING_SUPABASE_CONFIG_MESSAGE =
   `Missing NEXT_PUBLIC_SUPABASE_URL or a public Supabase key. Add ${SUPABASE_PUBLIC_KEY_ENV_LABEL} in your deployment environment settings.`;
 
 const hasWindow = () => typeof window !== "undefined";
-const getSupabaseConfigReason = () =>
-  !SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY ? MISSING_SUPABASE_CONFIG_MESSAGE : null;
+const isLoopbackBrowserHost = () => hasWindow() && isLoopbackHostname(window.location.hostname);
+const getSupabaseConfigReason = () => {
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+    return MISSING_SUPABASE_CONFIG_MESSAGE;
+  }
+
+  if (SUPABASE_URL_IS_LOOPBACK && hasWindow() && !isLoopbackBrowserHost()) {
+    return DEPLOYED_LOOPBACK_SUPABASE_MESSAGE;
+  }
+
+  return null;
+};
 
 const getSupabaseHostname = () => {
   if (!SUPABASE_URL) {
@@ -29,11 +46,15 @@ const getSupabaseHostname = () => {
 
 export const isLoopbackSupabaseUrl = (() => {
   const hostname = getSupabaseHostname();
-  return hostname ? LOOPBACK_HOSTS.has(hostname) : false;
+  return isLoopbackHostname(hostname);
 })();
 
 export const getDefaultSupabaseUnavailableMessage = () =>
-  isLoopbackSupabaseUrl ? LOCAL_SUPABASE_UNAVAILABLE_MESSAGE : CLOUD_SUPABASE_UNAVAILABLE_MESSAGE;
+  isLoopbackSupabaseUrl
+    ? !hasWindow() || isLoopbackBrowserHost()
+      ? LOCAL_SUPABASE_UNAVAILABLE_MESSAGE
+      : DEPLOYED_LOOPBACK_SUPABASE_MESSAGE
+    : CLOUD_SUPABASE_UNAVAILABLE_MESSAGE;
 
 const SUPABASE_STORAGE_KEY = (() => {
   const hostname = getSupabaseHostname();

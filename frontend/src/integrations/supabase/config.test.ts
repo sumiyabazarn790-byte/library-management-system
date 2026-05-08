@@ -12,6 +12,7 @@ describe("resolveSupabasePublicConfig", () => {
       url: "https://demo.supabase.co",
       publicKey: "publishable-key",
       hasConfig: true,
+      isLoopback: false,
       publicKeyEnvName: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     });
   });
@@ -26,6 +27,7 @@ describe("resolveSupabasePublicConfig", () => {
       url: "https://demo.supabase.co",
       publicKey: "anon-key",
       hasConfig: true,
+      isLoopback: false,
       publicKeyEnvName: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     });
   });
@@ -40,7 +42,23 @@ describe("resolveSupabasePublicConfig", () => {
       url: "",
       publicKey: "",
       hasConfig: false,
+      isLoopback: false,
       publicKeyEnvName: null,
+    });
+  });
+
+  it("marks loopback Supabase URLs so hosted deployments can block them", () => {
+    expect(
+      resolveSupabasePublicConfig({
+        NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "publishable-key",
+      } as NodeJS.ProcessEnv),
+    ).toEqual({
+      url: "http://127.0.0.1:54321",
+      publicKey: "publishable-key",
+      hasConfig: true,
+      isLoopback: true,
+      publicKeyEnvName: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     });
   });
 });

@@ -3,15 +3,28 @@ import { BookOpen, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  DEPLOYED_LOOPBACK_SUPABASE_MESSAGE,
+  LOCAL_SUPABASE_UNAVAILABLE_MESSAGE,
+} from "@/integrations/supabase/availability";
 
 const POST_LOGIN_REDIRECT = { pathname: "/app", hash: "#browse" } as const;
-const LOCAL_DEMO_CREDENTIALS =
-  process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID === "local"
-    ? {
-        email: "demo@aetheria.local",
-        password: "demo1234",
-      }
-    : null;
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
+
+const getLocalDemoCredentials = () => {
+  const isLocalProject = process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID === "local";
+  const isLoopbackBrowser =
+    typeof window !== "undefined" ? LOOPBACK_HOSTS.has(window.location.hostname) : false;
+
+  if (!isLocalProject || !isLoopbackBrowser) {
+    return null;
+  }
+
+  return {
+    email: "demo@aetheria.local",
+    password: "demo1234",
+  };
+};
 
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true">
@@ -37,6 +50,7 @@ const GoogleIcon = () => (
 const Auth = () => {
   const { signIn, signUp, signInWithGoogle, resendConfirmationEmail, user, loading, authUnavailableMessage } = useAuth();
   const navigate = useNavigate();
+  const localDemoCredentials = getLocalDemoCredentials();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -47,6 +61,8 @@ const Auth = () => {
   const [resendBusy, setResendBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const authDisabled = Boolean(authUnavailableMessage);
+  const showLocalDevHint = authUnavailableMessage === LOCAL_SUPABASE_UNAVAILABLE_MESSAGE;
+  const showDeployHint = authUnavailableMessage === DEPLOYED_LOOPBACK_SUPABASE_MESSAGE;
   const shouldRedirectAuthenticatedUser = !loading && Boolean(user);
 
   useEffect(() => {
@@ -134,13 +150,13 @@ const Auth = () => {
   };
 
   const fillDemoCredentials = () => {
-    if (!LOCAL_DEMO_CREDENTIALS) {
+    if (!localDemoCredentials) {
       return;
     }
 
     setMode("signin");
-    setEmail(LOCAL_DEMO_CREDENTIALS.email);
-    setPassword(LOCAL_DEMO_CREDENTIALS.password);
+    setEmail(localDemoCredentials.email);
+    setPassword(localDemoCredentials.password);
     setConfirmationEmail("");
     setFormError(null);
     toast.message("Local demo login form belen bolloo.");
@@ -203,14 +219,14 @@ const Auth = () => {
           Signup deer <code>422</code> haragdval ihevchlen ene email-eer account al hediiin uusssen baidag.
         </p>
 
-        {LOCAL_DEMO_CREDENTIALS && !authDisabled && (
+        {localDemoCredentials && !authDisabled && (
           <div className="mt-4 rounded-xl border border-secondary/30 bg-secondary-deep/10 px-4 py-3 text-sm">
             <p className="font-medium text-foreground">Local demo account</p>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Email: <span className="text-foreground">{LOCAL_DEMO_CREDENTIALS.email}</span>
+              Email: <span className="text-foreground">{localDemoCredentials.email}</span>
             </p>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Password: <span className="text-foreground">{LOCAL_DEMO_CREDENTIALS.password}</span>
+              Password: <span className="text-foreground">{localDemoCredentials.password}</span>
             </p>
             <button
               type="button"
@@ -225,10 +241,18 @@ const Auth = () => {
         {authUnavailableMessage && (
           <div className="mt-4 rounded-xl border border-border bg-surface-elevated px-4 py-3 text-sm text-foreground">
             <p>{authUnavailableMessage}</p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Local dev ashiglah bol Docker Desktop aa asaagaad <code>supabase start --workdir backend</code> ajilluulna
-              uu.
-            </p>
+            {showLocalDevHint ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Local dev ashiglah bol Docker Desktop aa asaagaad <code>supabase start --workdir backend</code>{" "}
+                ajilluulna uu.
+              </p>
+            ) : null}
+            {showDeployHint ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Deploy environment deer <code>NEXT_PUBLIC_SUPABASE_URL</code> utgaa <code>https://&lt;project-ref&gt;.supabase.co</code>,{" "}
+                <code>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code> utgaa public key-r ni solij redeploy hiine uu.
+              </p>
+            ) : null}
           </div>
         )}
 
