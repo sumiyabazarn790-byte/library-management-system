@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
     "clean": "node --input-type=module -e \"import { rmSync } from 'node:fs'; for (const path of ['.next', '.next-dev', 'tsconfig.tsbuildinfo']) { rmSync(path, { recursive: true, force: true }); }\"",

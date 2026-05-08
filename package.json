@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "postinstall": "npm install --prefix frontend",
     "dev": "npm --prefix frontend run dev",
     "dev:clean": "npm --prefix frontend run dev:clean",
     "build": "npm --prefix frontend run build",
@@ -24,6 +25,9 @@
     "db:push:linked": "supabase db push --workdir backend --include-all --linked",
     "seed:books": "node backend/scripts/seed-demo-books.js",
     "seed:books:reset": "node backend/scripts/seed-demo-books.js --clean"
+  },
+  "engines": {
+    "node": "22.x"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",
