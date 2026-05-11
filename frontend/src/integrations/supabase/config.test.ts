@@ -61,4 +61,34 @@ describe("resolveSupabasePublicConfig", () => {
       publicKeyEnvName: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     });
   });
+
+  it("migrates known stale hosted projects to the active production Supabase project", () => {
+    expect(
+      resolveSupabasePublicConfig({
+        NEXT_PUBLIC_SUPABASE_URL: "https://zqzfbksoryafdymzrord.supabase.co",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tDHilTgQswgrwopphkumAA_k--8ExEN",
+      } as NodeJS.ProcessEnv),
+    ).toEqual({
+      url: "https://origwdglnvvkilfuvrpa.supabase.co",
+      publicKey: "sb_publishable_3FHQqosmVQiCDT46oHC17A_B19S8Arl",
+      hasConfig: true,
+      isLoopback: false,
+      publicKeyEnvName: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    });
+  });
+
+  it("keeps local loopback development config untouched even if the publishable key matches an old hosted project", () => {
+    expect(
+      resolveSupabasePublicConfig({
+        NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tDHilTgQswgrwopphkumAA_k--8ExEN",
+      } as NodeJS.ProcessEnv),
+    ).toEqual({
+      url: "http://127.0.0.1:54321",
+      publicKey: "sb_publishable_tDHilTgQswgrwopphkumAA_k--8ExEN",
+      hasConfig: true,
+      isLoopback: true,
+      publicKeyEnvName: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    });
+  });
 });

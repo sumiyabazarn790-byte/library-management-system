@@ -20,7 +20,7 @@
     "db:stop": "supabase stop --workdir backend",
     "db:restart": "npm run db:stop && npm run db:start",
     "db:restart:minimal": "npm run db:stop && npm run db:start:minimal",
-    "db:link": "supabase link --workdir backend --project-ref niizgpjrogivqtxjqedp",
+    "db:link": "supabase link --workdir backend --project-ref origwdglnvvkilfuvrpa",
     "db:push": "supabase db push --workdir backend --include-all --local",
     "db:push:linked": "supabase db push --workdir backend --include-all --linked",
     "seed:books": "node backend/scripts/seed-demo-books.js",

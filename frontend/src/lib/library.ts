@@ -51,6 +51,8 @@ const UUID_PATTERN =
 export const isUuid = (value: string | null | undefined) =>
   Boolean(value && UUID_PATTERN.test(value.trim()));
 
+const recoverableLibraryErrorCodes = new Set(["42P01", "42501", "42703", "42804", "42883"]);
+
 const recoverableLibraryErrorPatterns = [
   /Local Supabase backend is not running/i,
   /Failed to fetch/i,
@@ -64,13 +66,27 @@ const recoverableLibraryErrorPatterns = [
   /column .*borrow_currency/i,
   /column .*created_at/i,
   /search_books_fuzzy/i,
+  /Could not find the function public\.search_books_fuzzy/i,
+  /permission denied/i,
+  /insufficient privilege/i,
+  /row-level security/i,
+  /structure of query does not match function result type/i,
+  /returned record type does not match expected/i,
   /relation .*saved_books/i,
   /Could not find the table ['"]public\.saved_books['"]/i,
 ];
 
 const isRecoverableLibraryError = (error: unknown) => {
+  const code =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code.toUpperCase()
+      : null;
   const message = error instanceof Error ? error.message : String(error ?? "");
-  return recoverableLibraryErrorPatterns.some((pattern) => pattern.test(message));
+  return Boolean(code && recoverableLibraryErrorCodes.has(code)) ||
+    recoverableLibraryErrorPatterns.some((pattern) => pattern.test(message));
 };
 
 const filterFallbackBooks = (query: string, limit: number, publicOnly = false) => {

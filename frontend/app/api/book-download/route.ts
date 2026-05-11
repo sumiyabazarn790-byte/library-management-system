@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { resolveSupabasePublicConfig } from "@/integrations/supabase/config";
 import { getPublicDomainDownloadCandidates } from "@/lib/publicDomainBooks";
 
 export const runtime = "nodejs";
@@ -7,15 +8,17 @@ export const runtime = "nodejs";
 const getEnv = (name: string) => process.env[name]?.trim() || "";
 
 const getSupabaseConfig = () => {
-  const url = getEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const anonKey = getEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") || getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  const serviceRoleKey = getEnv("SUPABASE_SECRET_KEY") || getEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const { url, publicKey } = resolveSupabasePublicConfig({
+    NEXT_PUBLIC_SUPABASE_URL: getEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: getEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+  });
 
-  if (!url || !anonKey || !serviceRoleKey) {
+  if (!url || !publicKey) {
     throw new Error("Missing Supabase configuration for secure downloads.");
   }
 
-  return { url, anonKey, serviceRoleKey };
+  return { url, publicKey };
 };
 
 const getBearerToken = (request: Request) => {
@@ -74,9 +77,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
     }
 
-    const { url, anonKey, serviceRoleKey } = getSupabaseConfig();
-    const authClient = createClient(url, anonKey);
-    const serviceClient = createClient(url, serviceRoleKey);
+    const { url, publicKey } = getSupabaseConfig();
+    const authClient = createClient(url, publicKey);
+    const publicClient = createClient(url, publicKey);
     const { searchParams } = new URL(request.url);
     const bookId = searchParams.get("bookId")?.trim() ?? "";
 
@@ -93,7 +96,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
     }
 
-    const { data: book, error: bookError } = await serviceClient
+    const { data: book, error: bookError } = await publicClient
       .from("books")
       .select("id, title, author")
       .eq("id", bookId)

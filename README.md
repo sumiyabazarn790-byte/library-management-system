@@ -42,6 +42,10 @@ Notes:
 - Frontend env values live in `frontend/.env.local`.
 - For Vercel deployments, also set `NEXT_PUBLIC_SUPABASE_URL` and a public Supabase key in Project Settings -> Environment Variables.
 - Preferred key name is `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; `NEXT_PUBLIC_SUPABASE_ANON_KEY` is still accepted as a legacy fallback.
+- Google login deploy hiisnii daraa `redirect_uri_mismatch` garch baival 2 gazar zaaval shinechilne:
+  `Supabase Dashboard -> Authentication -> URL Configuration` deer `Site URL`-aa deploy domain-r ni tavij, redirect URL-d `https://<your-domain>/auth/callback` nemne.
+  `Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client` deer `Authorized redirect URI`-d `https://<your-project-ref>.supabase.co/auth/v1/callback` nemne.
+- `backend/supabase/config.toml` dotor Google provider-iin local callback-iig cloud-d hardcode hiihgui. Local dev-d bol Supabase CLI ooroo `http://127.0.0.1:54321/auth/v1/callback` ashiglana.
 - Frontend-only QPay branding can be added to `frontend/.env.local`:
   `NEXT_PUBLIC_QPAY_MERCHANT_NAME=Aetheria Library`
 - For a static local QR image instead of real invoice generation, set

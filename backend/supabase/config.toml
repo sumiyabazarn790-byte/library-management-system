@@ -27,7 +27,6 @@ enable_confirmations = false
 enabled = true
 client_id = "980275868880-mda4f7is6dvmj8r5kov0qv2e2l0ac0of.apps.googleusercontent.com"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET)"
-redirect_uri = "http://127.0.0.1:54321/auth/v1/callback"
 skip_nonce_check = false
 
 [functions.chat]
