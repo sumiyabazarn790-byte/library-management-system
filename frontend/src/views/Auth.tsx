@@ -11,21 +11,6 @@ import {
 const POST_LOGIN_REDIRECT = { pathname: "/app", hash: "#browse" } as const;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
-const getLocalDemoCredentials = () => {
-  const isLocalProject = process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID === "local";
-  const isLoopbackBrowser =
-    typeof window !== "undefined" ? LOOPBACK_HOSTS.has(window.location.hostname) : false;
-
-  if (!isLocalProject || !isLoopbackBrowser) {
-    return null;
-  }
-
-  return {
-    email: "demo@aetheria.local",
-    password: "demo1234",
-  };
-};
-
 const GoogleIcon = () => (
   <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true">
     <path
@@ -50,7 +35,9 @@ const GoogleIcon = () => (
 const Auth = () => {
   const { signIn, signUp, signInWithGoogle, resendConfirmationEmail, user, loading, authUnavailableMessage } = useAuth();
   const navigate = useNavigate();
-  const localDemoCredentials = getLocalDemoCredentials();
+  const showLocalSignupHint =
+    process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID === "local" &&
+    (typeof window !== "undefined" ? LOOPBACK_HOSTS.has(window.location.hostname) : false);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -149,19 +136,6 @@ const Auth = () => {
     }
   };
 
-  const fillDemoCredentials = () => {
-    if (!localDemoCredentials) {
-      return;
-    }
-
-    setMode("signin");
-    setEmail(localDemoCredentials.email);
-    setPassword(localDemoCredentials.password);
-    setConfirmationEmail("");
-    setFormError(null);
-    toast.message("Local demo login form belen bolloo.");
-  };
-
   const handleResendConfirmation = async () => {
     const targetEmail = confirmationEmail || email.trim().toLowerCase();
     if (!targetEmail) {
@@ -219,21 +193,23 @@ const Auth = () => {
           Signup deer <code>422</code> haragdval ihevchlen ene email-eer account al hediiin uusssen baidag.
         </p>
 
-        {localDemoCredentials && !authDisabled && (
+        {showLocalSignupHint && !authDisabled && (
           <div className="mt-4 rounded-xl border border-secondary/30 bg-secondary-deep/10 px-4 py-3 text-sm">
-            <p className="font-medium text-foreground">Local demo account</p>
+            <p className="font-medium text-foreground">Local auth belen baina</p>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Email: <span className="text-foreground">{localDemoCredentials.email}</span>
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Password: <span className="text-foreground">{localDemoCredentials.password}</span>
+              Local Supabase deer email confirmation untraaltai tul <span className="text-foreground">Burtguuleh</span>{" "}
+              tab-aar shine account uusgeed shuud nevterch bolno.
             </p>
             <button
               type="button"
-              onClick={fillDemoCredentials}
+              onClick={() => {
+                setMode("signup");
+                setConfirmationEmail("");
+                setFormError(null);
+              }}
               className="mt-3 inline-flex h-9 items-center justify-center rounded-md border border-secondary/40 px-4 text-xs font-semibold text-secondary transition-colors hover:bg-secondary-deep/20"
             >
-              Demo login ashiglah
+              Burtguuleh ruu shiljih
             </button>
           </div>
         )}
@@ -328,15 +304,15 @@ const Auth = () => {
             </label>
             <input
               id="email"
-              type="email"  
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={authDisabled || busy}
               className="mt-1 block w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:ring-primary focus:ring-1 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
-        
-          <div> 
+
+          <div>
             <label htmlFor="password" className="block text-xs font-medium text-muted-foreground">
               Nuuts ug
             </label>
@@ -349,7 +325,7 @@ const Auth = () => {
               className="mt-1 block w-full rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:ring-primary focus:ring-1 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
-          
+
           {formError && <p className="text-xs text-red-500">{formError}</p>}
           <button
             type="submit"
@@ -362,6 +338,6 @@ const Auth = () => {
       </div>
     </div>
   );
-}
+};
 
 export default Auth;
