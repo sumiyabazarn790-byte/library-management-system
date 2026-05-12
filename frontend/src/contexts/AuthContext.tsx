@@ -224,25 +224,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const firstAttempt = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
+
+    const firstResult = mapAuthError(firstAttempt.error?.message);
+
+    if (!firstResult.error) {
+      return firstResult;
+    }
+
+    if (firstResult.reason !== "email_not_confirmed") {
+      return firstResult;
+    }
+
     const authGateResult = await postAuthAction("/api/auth/password-signin", {
       email: normalizedEmail,
       password,
     });
 
-    if (authGateResult.error) {
-      if (authGateResult.reason && authGateResult.reason !== "unknown") {
-        return authGateResult;
-      }
-
-      console.warn("password-signin gate skipped", authGateResult.error);
+    if (authGateResult.error && authGateResult.reason && authGateResult.reason !== "unknown") {
+      return authGateResult;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
+    if (authGateResult.error) {
+      console.warn("password-signin recovery skipped", authGateResult.error);
+    }
+
+    const secondAttempt = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password,
     });
 
-    return mapAuthError(error?.message);
+    return mapAuthError(secondAttempt.error?.message);
   };
 
   const signUp: AuthCtx["signUp"] = async (email, password, displayName) => {
