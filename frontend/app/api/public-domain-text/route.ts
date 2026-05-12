@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
-import { getPublicDomainReaderUrl, getPublicDomainTextCandidates } from "@/lib/publicDomainBooks";
+import {
+  getPublicDomainFallbackSections,
+  getPublicDomainReaderUrl,
+  getPublicDomainTextCandidates,
+} from "@/lib/publicDomainBooks";
 
 export const runtime = "nodejs";
 
 const MIN_FULL_TEXT_LENGTH = 2500;
 const MAX_SECTION_LENGTH = 1600;
 const MAX_SECTIONS = 180;
+const TEXT_FETCH_TIMEOUT_MS = 3500;
 const TEXT_HEADERS = {
   Accept: "text/plain; charset=utf-8",
   "User-Agent": "Aetheria Reader/1.0",
@@ -85,30 +90,37 @@ const toReaderSections = (value: string) =>
     .flatMap(splitLongParagraph)
     .slice(0, MAX_SECTIONS);
 
-const readFirstSuccessfulText = async (urls: string[]) => {
-  for (const url of urls) {
-    try {
-      const response = await fetch(url, {
-        headers: TEXT_HEADERS,
-        next: { revalidate: 86400 },
-      });
+const readTextCandidate = async (url: string) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TEXT_FETCH_TIMEOUT_MS);
 
-      if (!response.ok) {
-        continue;
-      }
+  try {
+    const response = await fetch(url, {
+      headers: TEXT_HEADERS,
+      next: { revalidate: 86400 },
+      signal: controller.signal,
+    });
 
-      const text = await response.text();
-      if (normalizeText(text).length < MIN_FULL_TEXT_LENGTH) {
-        continue;
-      }
-
-      return text;
-    } catch {
-      continue;
+    if (!response.ok) {
+      return null;
     }
-  }
 
-  return null;
+    const text = await response.text();
+    if (normalizeText(text).length < MIN_FULL_TEXT_LENGTH) {
+      return null;
+    }
+
+    return text;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const readFirstSuccessfulText = async (urls: string[]) => {
+  const results = await Promise.all(urls.map((url) => readTextCandidate(url)));
+  return results.find((value): value is string => Boolean(value)) ?? null;
 };
 
 export async function GET(request: Request) {
@@ -123,6 +135,7 @@ export async function GET(request: Request) {
   const sourceBook = { title, author };
   const candidateUrls = getPublicDomainTextCandidates(sourceBook);
   const readerUrl = getPublicDomainReaderUrl(sourceBook);
+  const fallbackSections = getPublicDomainFallbackSections(sourceBook);
 
   if (!candidateUrls.length || !readerUrl) {
     return NextResponse.json({ error: "No public-domain text source is configured for this book." }, { status: 404 });
@@ -131,12 +144,32 @@ export async function GET(request: Request) {
   const fullText = await readFirstSuccessfulText(candidateUrls);
 
   if (!fullText) {
+    if (fallbackSections?.length) {
+      return NextResponse.json({
+        sections: fallbackSections,
+        sourceUrl: readerUrl,
+        readerUrl,
+        fallback: true,
+        message: "Original source timed out, so Aetheria is using the built-in preview text for now.",
+      });
+    }
+
     return NextResponse.json({ error: "Full reader text could not be loaded right now." }, { status: 502 });
   }
 
   const sections = toReaderSections(trimProjectGutenbergBoilerplate(fullText));
 
   if (!sections.length) {
+    if (fallbackSections?.length) {
+      return NextResponse.json({
+        sections: fallbackSections,
+        sourceUrl: readerUrl,
+        readerUrl,
+        fallback: true,
+        message: "Original source returned unusable text, so Aetheria is using the built-in preview text for now.",
+      });
+    }
+
     return NextResponse.json({ error: "Reader text was fetched, but no readable sections were found." }, { status: 502 });
   }
 

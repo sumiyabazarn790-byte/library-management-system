@@ -1,4 +1,5 @@
 import type { Book } from "@/types/library";
+import { fallbackBooks } from "@/lib/fallbackBooks";
 
 type PublicDomainBookRecord = {
   ebookId: string;
@@ -61,6 +62,20 @@ export const getPublicDomainTextCandidates = (book: Pick<Book, "title" | "author
 
 export const getPublicDomainDownloadCandidates = (book: Pick<Book, "title" | "author">) =>
   getPublicDomainTextCandidates(book);
+
+export const getPublicDomainFallbackSections = (book: Pick<Book, "title" | "author">) => {
+  const normalizedTitle = book.title.trim().toLowerCase();
+  const normalizedAuthor = book.author.trim().toLowerCase();
+
+  const fallbackBook =
+    fallbackBooks.find(
+      (candidate) =>
+        candidate.title.trim().toLowerCase() === normalizedTitle &&
+        candidate.author.trim().toLowerCase() === normalizedAuthor,
+    ) ?? null;
+
+  return fallbackBook?.reading_content?.filter((section) => section.trim().length > 0) ?? null;
+};
 
 export const getPublicDomainTextApiPath = (book: Pick<Book, "title" | "author">) =>
   `/api/public-domain-text?title=${encodeURIComponent(book.title)}&author=${encodeURIComponent(book.author)}`;

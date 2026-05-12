@@ -256,6 +256,8 @@ const Reader = () => {
           sections?: string[];
           sourceUrl?: string;
           readerUrl?: string;
+          fallback?: boolean;
+          message?: string;
         };
 
         if (!response.ok) {
@@ -264,8 +266,9 @@ const Reader = () => {
 
         if (!canceled && Array.isArray(data.sections) && data.sections.length) {
           setDisplaySections(data.sections);
-          setFullTextLoaded(true);
+          setFullTextLoaded(!data.fallback);
           setFullTextSourceUrl(data.sourceUrl || data.readerUrl || "");
+          setFullTextErrorMessage(data.fallback ? data.message || "Built-in preview text is being used right now." : "");
         }
       } catch (error) {
         if (!canceled) {

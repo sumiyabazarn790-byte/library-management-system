@@ -110,6 +110,7 @@ const ROMANIZED_MONGOLIAN_TOKENS = [
   "bidend",
   "tand",
   "ta",
+  "ooriin",
   "yu",
   "yuu",
   "uu",
@@ -120,6 +121,7 @@ const ROMANIZED_MONGOLIAN_TOKENS = [
   "bna",
   "baina",
   "bn",
+  "loan",
   "nom",
   "nomoo",
   "nomnuud",
@@ -149,8 +151,24 @@ const ROMANIZED_MONGOLIAN_TOKENS = [
 
 const ENGLISH_LANGUAGE_HINTS = /\b(what|which|where|when|why|how|show|find|search|borrow|request|return|book|books|author|title|topic)\b/i;
 
+const canonicalizeIntentWord = (word: string) => {
+  const collapsed = word.replace(/([a-z])\1{2,}/g, "$1$1");
+
+  if (/^min+i+$/.test(collapsed)) return "minii";
+  if (/^loan?s$/.test(collapsed)) return "loan";
+  if (/^books?$/.test(collapsed)) return "book";
+  if (/^zee+l+(?:e+h)?$/.test(collapsed)) return "zeel";
+  if (/^zee+l+s?e*n+$/.test(collapsed)) return "zeelsen";
+  if (/^zahia+l+(?:a+h)?$/.test(collapsed)) return "zahial";
+  if (/^zahia+l+s?a*n+$/.test(collapsed)) return "zahialsan";
+  if (/^nom(?:oo)?$/.test(collapsed)) return "nom";
+  if (/^nom+n?u+u+d+(?:aa|ee|oo)?$/.test(collapsed)) return "nom";
+
+  return collapsed;
+};
+
 const isRomanizedMongolian = (text: string) => {
-  const normalized = normalizeAssistantText(text);
+  const normalized = normalizeIntentText(text);
   const words = normalized.split(" ").filter(Boolean);
   const matchedTokenCount = words.filter((word) => ROMANIZED_MONGOLIAN_TOKENS.includes(word)).length;
 
@@ -162,8 +180,8 @@ const isRomanizedMongolian = (text: string) => {
     return true;
   }
 
-  return /\b(minii|namaig|nadad|zeel|zeelsen|zahial|zahialsan|butsaa|nomnuud|nomoo|genre|yuu|hiij|chadah|tusal|sanal|hai|ol|ogooch)\b/i.test(
-    text,
+  return /\b(minii|namaig|nadad|ooriin|loan|zeel|zeelsen|zahial|zahialsan|butsaa|nom|genre|yuu|hiij|chadah|tusal|sanal|hai|ol|ogooch)\b/i.test(
+    normalized,
   );
 };
 
@@ -173,6 +191,15 @@ const normalizeAssistantText = (text: string) =>
     .toLowerCase()
     .replace(/[“”"']/g, "")
     .replace(/\s+/g, " ");
+
+const normalizeIntentText = (text: string) =>
+  normalizeAssistantText(text)
+    .split(" ")
+    .filter(Boolean)
+    .map(canonicalizeIntentWord)
+    .join(" ");
+
+const tokenizeIntentText = (text: string) => normalizeIntentText(text).split(" ").filter(Boolean);
 
 const cleanupExtractedQuery = (query: string) =>
   query
@@ -214,6 +241,21 @@ const isLoanOverviewQuestion = (text: string) =>
   /(миний\s+(?:loan|loans|зээл|зээлсэн|захиалсан)|өөрийн\s+loans|show\s+my\s+loans|my\s+(?:loans|borrowed books|requested books)|current\s+loans|list\s+my\s+loans|minii\s+(?:loan|loans|zeelsen|zahialsan)|due\s+books)/i.test(
     text,
   );
+
+const LOAN_OVERVIEW_PRONOUNS = new Set(["minii", "my", "nadad", "namaig"]);
+const LOAN_OVERVIEW_MARKERS = new Set(["loan", "borrowed", "requested", "due", "zeelsen", "zahialsan"]);
+const LOAN_OVERVIEW_STEMS = new Set(["zeel", "zahial"]);
+const LOAN_OVERVIEW_BOOK_WORDS = new Set(["nom", "book"]);
+
+const hasLoanOverviewHint = (text: string) => {
+  const words = tokenizeIntentText(text);
+  const hasPronoun = words.some((word) => LOAN_OVERVIEW_PRONOUNS.has(word));
+  const hasMarker = words.some((word) => LOAN_OVERVIEW_MARKERS.has(word));
+  const hasLoanStem = words.some((word) => LOAN_OVERVIEW_STEMS.has(word));
+  const hasBookWord = words.some((word) => LOAN_OVERVIEW_BOOK_WORDS.has(word));
+
+  return (hasPronoun && (hasMarker || hasLoanStem)) || (hasMarker && hasBookWord);
+};
 
 const isRecommendationQuestion = (text: string) =>
   /(recommend|suggest|санал\s+болго|sanal\s+bolgo|what should i read|ямар ном унш)/i.test(text);
@@ -262,7 +304,7 @@ export const detectAssistantIntent = (text: string): AssistantIntent => {
     return { kind: "capabilities", query: "" };
   }
 
-  if (isLoanOverviewQuestion(text)) {
+  if (isLoanOverviewQuestion(text) || hasLoanOverviewHint(text)) {
     return { kind: "loans", query: "" };
   }
 

@@ -186,19 +186,19 @@ const Auth = () => {
         </button>
 
         <p className="mt-2 text-center text-xs leading-relaxed text-muted-foreground">
-          Password login deer browser console-d <code>400</code> haragdval ihevchlen buruu nuuts ug, burtgelgui
-          account, esvel email batalgaajaagui baih tohioldol baina.
+          Password login deer browser console-d <code>400</code> esvel <code>401</code> haragdval ihevchlen buruu nuuts
+          ug esvel burtgelgui account baih tohioldol baina.
         </p>
         <p className="mt-1 text-center text-xs leading-relaxed text-muted-foreground">
-          Signup deer <code>422</code> haragdval ihevchlen ene email-eer account al hediiin uusssen baidag.
+          Shine account-uud email verification shaardahgui. Signup deer <code>422</code> haragdval ihevchlen ene
+          email-eer account al hediiin uusssen baidag.
         </p>
 
         {showLocalSignupHint && !authDisabled && (
           <div className="mt-4 rounded-xl border border-secondary/30 bg-secondary-deep/10 px-4 py-3 text-sm">
-            <p className="font-medium text-foreground">Local auth belen baina</p>
+            <p className="font-medium text-foreground">Email batalgaajuulalt shaardahgui</p>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Local Supabase deer email confirmation untraaltai tul <span className="text-foreground">Burtguuleh</span>{" "}
-              tab-aar shine account uusgeed shuud nevterch bolno.
+              <span className="text-foreground">Burtguuleh</span> tab-aar shine account uusgeed shuud nevterch bolno.
             </p>
             <button
               type="button"

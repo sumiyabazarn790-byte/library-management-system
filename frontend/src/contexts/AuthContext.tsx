@@ -9,67 +9,8 @@ import {
   SUPABASE_AVAILABILITY_CHANGE_EVENT,
 } from "@/integrations/supabase/availability";
 import { buildAuthRedirectUrl } from "@/lib/auth";
+import { mapAuthError, type AuthResult } from "@/lib/authResult";
 import type { Profile } from "@/types/library";
-
-type AuthReason =
-  | "invalid_credentials"
-  | "email_not_confirmed"
-  | "user_already_registered"
-  | "provider_not_enabled"
-  | "signup_disabled"
-  | "unknown";
-
-type AuthResult = {
-  error: string | null;
-  reason?: AuthReason | null;
-  emailConfirmationRequired?: boolean;
-};
-
-const mapAuthError = (message: string | null | undefined): Pick<AuthResult, "error" | "reason"> => {
-  if (!message) {
-    return { error: null, reason: null };
-  }
-
-  if (/invalid login credentials/i.test(message)) {
-    return {
-      error: "Invalid email or password.",
-      reason: "invalid_credentials",
-    };
-  }
-
-  if (/email not confirmed/i.test(message)) {
-    return {
-      error: "Please confirm your email before signing in.",
-      reason: "email_not_confirmed",
-    };
-  }
-
-  if (/user already registered/i.test(message)) {
-    return {
-      error: "This email is already registered.",
-      reason: "user_already_registered",
-    };
-  }
-
-  if (/provider is not enabled/i.test(message) || /unsupported provider/i.test(message)) {
-    return {
-      error: "Google login is not enabled in your Supabase project.",
-      reason: "provider_not_enabled",
-    };
-  }
-
-  if (/signup is disabled/i.test(message)) {
-    return {
-      error: "Signups are currently disabled.",
-      reason: "signup_disabled",
-    };
-  }
-
-  return {
-    error: message,
-    reason: "unknown",
-  };
-};
 
 type AuthCtx = {
   user: User | null;
@@ -89,6 +30,34 @@ type AuthCtx = {
 const Context = createContext<AuthCtx | undefined>(undefined);
 const STALE_AUTH_SESSION_PATTERN =
   /user from sub claim in jwt does not exist|session from session_id claim in jwt does not exist|invalid refresh token|refresh token not found/i;
+
+const postAuthAction = async (path: string, payload: Record<string, unknown>): Promise<AuthResult> => {
+  try {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = (await response.json().catch(() => null)) as AuthResult | null;
+
+    if (data) {
+      return data;
+    }
+
+    return {
+      error: response.ok ? null : "Authentication request failed.",
+      reason: response.ok ? null : "unknown",
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Authentication request failed.",
+      reason: "unknown",
+    };
+  }
+};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -232,8 +201,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: authUnavailableMessage, reason: "unknown" };
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const authGateResult = await postAuthAction("/api/auth/password-signin", {
+      email: normalizedEmail,
+      password,
+    });
+
+    if (authGateResult.error) {
+      return authGateResult;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       password,
     });
 
@@ -245,19 +224,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: authUnavailableMessage, reason: "unknown" };
     }
 
-    const redirectUrl = buildAuthRedirectUrl("/");
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
+    const normalizedEmail = email.trim().toLowerCase();
+    const signupResult = await postAuthAction("/api/auth/signup", {
+      email: normalizedEmail,
       password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: { display_name: displayName },
-      },
+      displayName,
+    });
+
+    if (signupResult.error) {
+      return signupResult;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
     });
 
     return {
       ...mapAuthError(error?.message),
-      emailConfirmationRequired: !data.session,
+      emailConfirmationRequired: false,
     };
   };
 

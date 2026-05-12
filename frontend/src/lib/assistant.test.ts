@@ -16,6 +16,13 @@ describe("assistant intent detection", () => {
     });
   });
 
+  it("detects romanized loan overviews with stretched letters", () => {
+    expect(assistant.detectAssistantIntent("miniii zeelsen nomnuud")).toEqual({
+      kind: "loans",
+      query: "",
+    });
+  });
+
   it("extracts borrow targets from English commands", () => {
     expect(assistant.detectAssistantIntent("borrow atomic habits")).toEqual({
       kind: "borrow",
@@ -36,11 +43,22 @@ describe("assistant intent detection", () => {
       query: "Sapiens",
     });
   });
+
+  it("keeps short book titles with 'borrowed' in the name as searches", () => {
+    expect(assistant.detectAssistantIntent("Borrowed Alphabets")).toEqual({
+      kind: "search",
+      query: "Borrowed Alphabets",
+    });
+  });
 });
 
 describe("assistant capability copy", () => {
   it("detects Monglish prompts as Mongolian", () => {
     expect(assistant.detectAssistantLanguage("Hairiin nom bgaa yu")).toBe("mn");
+  });
+
+  it("detects stretched romanized Mongolian as Mongolian", () => {
+    expect(assistant.detectAssistantLanguage("miniii zeelsen nomnuud")).toBe("mn");
   });
 
   it("keeps the Mongolian capability list readable", () => {

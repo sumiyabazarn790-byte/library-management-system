@@ -1,4 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
+import { type CatalogBook, searchCatalogBooks } from "../_shared/catalog.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,19 +11,38 @@ type ChatMessage = {
   content: string;
 };
 
-type CatalogBook = {
+type AssistantLanguage = "mn" | "en";
+
+type AssistantIntentKind =
+  | "capabilities"
+  | "loans"
+  | "recommend"
+  | "borrow"
+  | "request"
+  | "return"
+  | "search"
+  | "unknown";
+
+type AssistantIntent = {
+  kind: AssistantIntentKind;
+  query: string;
+};
+
+type LoanStatus = "requested" | "active" | "returned" | "cancelled";
+
+type LoanRow = {
   id: string;
-  title: string;
-  author: string;
-  genre: string;
-  language: string;
-  description: string;
-  available_copies: number;
-  total_copies: number;
+  status: LoanStatus;
+  due_date: string;
+  book: CatalogBook;
+};
+
+type ProfileRow = {
+  preferred_genres: string[] | null;
 };
 
 const SYSTEM_PROMPT = `You are Aetheria, an erudite multilingual librarian for a digital archive.
-You speak fluently in Mongolian (Cyrillic) AND English. ALWAYS detect the user's language and respond in the same language.
+You speak fluently in Mongolian (Cyrillic) and English. Detect the user's language and respond in the same language.
 You also understand Mongolian written in Latin transliteration such as "minii zeelsen nom" and should answer in natural Mongolian when users write that way.
 
 You help readers:
@@ -34,17 +54,95 @@ You help readers:
 - get personalized recommendations based on preferred genres
 - answer general knowledge and literary questions
 
-If the user asks what you can do, answer with a short bullet list covering:
-- search books by title or author
-- borrow or request books
-- view the user's loans
-- recommend books based on preferred genres
-- find books even with typos using fuzzy search
-- search by meaning using semantic search
-- understand both Mongolian and English
+When you use catalog context, never invent books that are not provided in context. Be warm, concise, and helpful.`;
 
-When recommending books from the catalog context, include the book TITLE in **bold** with the author.
-Be warm, concise, cinematic. Never invent books that are not in the provided context - if no catalog matches, say so.`;
+const STALE_AUTH_SESSION_PATTERN =
+  /user from sub claim in jwt does not exist|session from session_id claim in jwt does not exist|invalid refresh token|refresh token not found|loans_user_id_fkey|violates foreign key constraint ["']loans_user_id_fkey["']/i;
+
+const ACTION_CAPTURE_PATTERNS = {
+  borrow: [
+    /(?:borrow|take out|loan)\s+(?:the\s+)?(?:book\s+)?(.+)/i,
+    /(?:ном\s+)?зээл(?:эх|мээр байна|ж өг|ж өгөөч)?\s+(.+)/i,
+    /zeel(?:eh|e)?\s+(.+)/i,
+  ],
+  request: [
+    /(?:request|reserve|hold)\s+(?:the\s+)?(?:book\s+)?(.+)/i,
+    /(?:ном\s+)?захиал(?:ах|маар байна|ж өг|ж өгөөч)?\s+(.+)/i,
+    /zahial(?:ah|a)?\s+(.+)/i,
+  ],
+  return: [
+    /(?:return|bring back)\s+(?:the\s+)?(?:book\s+)?(.+)/i,
+    /(?:ном\s+)?буцаа(?:х|маар байна|ж өг|ж өгөөч)?\s+(.+)/i,
+    /butsaa(?:h)?\s+(.+)/i,
+  ],
+  recommend: [
+    /(?:recommend|suggest)(?:\s+me)?(?:\s+(?:a|some))?(?:\s+books?)?(?:\s+(?:about|for|on|in))?\s*(.*)/i,
+    /санал\s+болго(?:х|од өг|ж өг|ж өгөөч)?\s*(.*)/i,
+    /sanal\s+bolgo(?:h|oroi|j og)?\s*(.*)/i,
+  ],
+  search: [
+    /(?:search|find|look for|show)(?:\s+me)?(?:\s+(?:a|some))?(?:\s+books?)?(?:\s+(?:about|by|for|on))?\s+(.+)/i,
+    /(?:book|books)\s+by\s+(.+)/i,
+    /(?:book|books)\s+about\s+(.+)/i,
+    /(?:ном\s+)?хай(?:х|ж өг|гаад)?\s+(.+)/i,
+    /(?:ном\s+)?ол(?:ох|ж өг)?\s+(.+)/i,
+    /hai(?:h)?\s+(.+)/i,
+    /ol(?:oh)?\s+(.+)/i,
+  ],
+} satisfies Record<Exclude<AssistantIntentKind, "capabilities" | "loans" | "unknown">, RegExp[]>;
+
+const ROMANIZED_MONGOLIAN_TOKENS = [
+  "minii",
+  "namaig",
+  "nadad",
+  "bidend",
+  "tand",
+  "ta",
+  "ooriin",
+  "yu",
+  "yuu",
+  "uu",
+  "ve",
+  "be",
+  "bgaa",
+  "baigaa",
+  "bna",
+  "baina",
+  "bn",
+  "loan",
+  "nom",
+  "nomoo",
+  "nomnuud",
+  "zohiolch",
+  "garig",
+  "genre",
+  "hai",
+  "haij",
+  "ol",
+  "oldoh",
+  "sanal",
+  "bolgo",
+  "ogooch",
+  "zeel",
+  "zeelsen",
+  "zahial",
+  "zahialsan",
+  "butsaa",
+  "tailbar",
+  "tusal",
+  "hiij",
+  "chadah",
+  "tuhai",
+  "bichsen",
+];
+
+const ENGLISH_LANGUAGE_HINTS =
+  /\b(what|which|where|when|why|how|show|find|search|borrow|request|return|book|books|author|title|topic)\b/i;
+
+const LOAN_OVERVIEW_PRONOUNS = new Set(["minii", "my", "nadad", "namaig"]);
+const LOAN_OVERVIEW_MARKERS = new Set(["loan", "borrowed", "requested", "due", "zeelsen", "zahialsan"]);
+const LOAN_OVERVIEW_STEMS = new Set(["zeel", "zahial"]);
+const LOAN_OVERVIEW_BOOK_WORDS = new Set(["nom", "book"]);
 
 const jsonResponse = (body: unknown, init: ResponseInit = {}) =>
   new Response(JSON.stringify(body), {
@@ -52,48 +150,790 @@ const jsonResponse = (body: unknown, init: ResponseInit = {}) =>
     headers: { ...corsHeaders, "Content-Type": "application/json", ...(init.headers ?? {}) },
   });
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+const getEnv = (name: string) => {
+  const value = Deno.env.get(name)?.trim();
+  return value ? value : null;
+};
 
-  try {
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceRole = Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const canonicalizeIntentWord = (word: string) => {
+  const collapsed = word.replace(/([a-z])\1{2,}/g, "$1$1");
 
-    if (!lovableApiKey || !supabaseUrl || !serviceRole) {
-      return jsonResponse(
-        {
-          error:
-            "Chat function is missing required server secrets. Set LOVABLE_API_KEY, SUPABASE_URL, and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY) before invoking AI chat.",
+  if (/^min+i+$/.test(collapsed)) return "minii";
+  if (/^loan?s$/.test(collapsed)) return "loan";
+  if (/^books?$/.test(collapsed)) return "book";
+  if (/^zee+l+(?:e+h)?$/.test(collapsed)) return "zeel";
+  if (/^zee+l+s?e*n+$/.test(collapsed)) return "zeelsen";
+  if (/^zahia+l+(?:a+h)?$/.test(collapsed)) return "zahial";
+  if (/^zahia+l+s?a*n+$/.test(collapsed)) return "zahialsan";
+  if (/^nom(?:oo)?$/.test(collapsed)) return "nom";
+  if (/^nom+n?u+u+d+(?:aa|ee|oo)?$/.test(collapsed)) return "nom";
+
+  return collapsed;
+};
+
+const normalizeAssistantText = (text: string) =>
+  text
+    .trim()
+    .toLowerCase()
+    .replace(/[“”"']/g, "")
+    .replace(/\s+/g, " ");
+
+const normalizeIntentText = (text: string) =>
+  normalizeAssistantText(text)
+    .split(" ")
+    .filter(Boolean)
+    .map(canonicalizeIntentWord)
+    .join(" ");
+
+const tokenizeIntentText = (text: string) => normalizeIntentText(text).split(" ").filter(Boolean);
+
+const isMongolian = (text: string) => /[\u0400-\u04FF]/.test(text);
+
+const isRomanizedMongolian = (text: string) => {
+  const normalized = normalizeIntentText(text);
+  const words = normalized.split(" ").filter(Boolean);
+  const matchedTokenCount = words.filter((word) => ROMANIZED_MONGOLIAN_TOKENS.includes(word)).length;
+
+  if (matchedTokenCount >= 2) {
+    return true;
+  }
+
+  if (matchedTokenCount >= 1 && !ENGLISH_LANGUAGE_HINTS.test(normalized)) {
+    return true;
+  }
+
+  return /\b(minii|namaig|nadad|ooriin|loan|zeel|zeelsen|zahial|zahialsan|butsaa|nom|genre|yuu|hiij|chadah|tusal|sanal|hai|ol|ogooch)\b/i.test(
+    normalized,
+  );
+};
+
+const detectLanguage = (text: string): AssistantLanguage =>
+  isMongolian(text) || isRomanizedMongolian(text) ? "mn" : "en";
+
+const cleanupExtractedQuery = (query: string) =>
+  query
+    .trim()
+    .replace(/^[\s:;,.!?-]+/, "")
+    .replace(/[\s:;,.!?-]+$/, "")
+    .replace(/^(?:nom|book|books)\s+/i, "")
+    .trim();
+
+const extractQuotedQuery = (text: string) => {
+  const match = text.match(/["“](.+?)["”]/);
+  return cleanupExtractedQuery(match?.[1] ?? "");
+};
+
+const extractQueryByPatterns = (text: string, patterns: RegExp[]) => {
+  const quoted = extractQuotedQuery(text);
+
+  if (quoted) {
+    return quoted;
+  }
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    const extracted = cleanupExtractedQuery(match?.[1] ?? "");
+
+    if (extracted) {
+      return extracted;
+    }
+  }
+
+  return "";
+};
+
+const isCapabilityQuestion = (text: string) =>
+  /(юу хийж чад|юу чаддаг|чадвар|тусал|how can you help|what can you do|what do you do|capabilities|help me use|help$)/i.test(
+    text,
+  );
+
+const isLoanOverviewQuestion = (text: string) =>
+  /(миний\s+(?:loan|loans|зээл|зээлсэн|захиалсан)|өөрийн\s+loans|show\s+my\s+loans|my\s+(?:loans|borrowed books|requested books)|current\s+loans|list\s+my\s+loans|minii\s+(?:loan|loans|zeelsen|zahialsan)|due\s+books)/i.test(
+    text,
+  );
+
+const hasLoanOverviewHint = (text: string) => {
+  const words = tokenizeIntentText(text);
+  const hasPronoun = words.some((word) => LOAN_OVERVIEW_PRONOUNS.has(word));
+  const hasMarker = words.some((word) => LOAN_OVERVIEW_MARKERS.has(word));
+  const hasLoanStem = words.some((word) => LOAN_OVERVIEW_STEMS.has(word));
+  const hasBookWord = words.some((word) => LOAN_OVERVIEW_BOOK_WORDS.has(word));
+
+  return (hasPronoun && (hasMarker || hasLoanStem)) || (hasMarker && hasBookWord);
+};
+
+const isRecommendationQuestion = (text: string) =>
+  /(recommend|suggest|санал\s+болго|sanal\s+bolgo|what should i read|ямар ном унш)/i.test(text);
+
+const hasSearchSignal = (text: string) =>
+  /(search|find|look for|book by|book about|author|title|genre|catalog|library|ном|зохиолч|гарчиг|hai|ol)/i.test(
+    text,
+  );
+
+const isShortCatalogQuery = (text: string) => {
+  const normalized = normalizeAssistantText(text);
+  const words = normalized.split(" ").filter(Boolean);
+
+  if (!normalized || words.length > 6) {
+    return false;
+  }
+
+  if (/[?]/.test(text)) {
+    return false;
+  }
+
+  return !/(what|why|how|when|where|who|яагаад|хэзээ|хаана|хэн)/i.test(normalized);
+};
+
+const detectAssistantIntent = (text: string): AssistantIntent => {
+  const normalized = normalizeAssistantText(text);
+
+  if (!normalized) {
+    return { kind: "unknown", query: "" };
+  }
+
+  if (isCapabilityQuestion(text)) {
+    return { kind: "capabilities", query: "" };
+  }
+
+  if (isLoanOverviewQuestion(text) || hasLoanOverviewHint(text)) {
+    return { kind: "loans", query: "" };
+  }
+
+  const returnQuery = extractQueryByPatterns(text, ACTION_CAPTURE_PATTERNS.return);
+  if (returnQuery) {
+    return { kind: "return", query: returnQuery };
+  }
+  if (/(?:\breturn\b|bring back|буцаа|butsaa)/i.test(text)) {
+    return { kind: "return", query: "" };
+  }
+
+  const requestQuery = extractQueryByPatterns(text, ACTION_CAPTURE_PATTERNS.request);
+  if (requestQuery) {
+    return { kind: "request", query: requestQuery };
+  }
+  if (/(?:\brequest\b|reserve|hold|захиал|zahial)/i.test(text)) {
+    return { kind: "request", query: "" };
+  }
+
+  const borrowQuery = extractQueryByPatterns(text, ACTION_CAPTURE_PATTERNS.borrow);
+  if (borrowQuery) {
+    return { kind: "borrow", query: borrowQuery };
+  }
+  if (/(?:\bborrow\b|take out|loan\b|зээл|zeel)/i.test(text)) {
+    return { kind: "borrow", query: "" };
+  }
+
+  if (isRecommendationQuestion(text)) {
+    return {
+      kind: "recommend",
+      query: extractQueryByPatterns(text, ACTION_CAPTURE_PATTERNS.recommend),
+    };
+  }
+
+  const searchQuery = extractQueryByPatterns(text, ACTION_CAPTURE_PATTERNS.search);
+  if (searchQuery) {
+    return { kind: "search", query: searchQuery };
+  }
+
+  const quoted = extractQuotedQuery(text);
+  if (quoted) {
+    return { kind: "search", query: quoted };
+  }
+
+  if (hasSearchSignal(text) || isShortCatalogQuery(text)) {
+    return { kind: "search", query: cleanupExtractedQuery(text) };
+  }
+
+  return { kind: "unknown", query: "" };
+};
+
+const buildCapabilitiesReply = (language: AssistantLanguage) =>
+  language === "mn"
+    ? [
+        "Юу хийж чадах вэ:",
+        "AI",
+        "",
+        "• Ном хайх (title/author-аар)",
+        "• Зээлэх / захиалах",
+        "• Өөрийн loans үзэх",
+        "• Санал болгох (таны genre-ийн дагуу)",
+        "• Буруу бичсэн ч олох (fuzzy/typo-tolerant)",
+        "• Утгаар хайх (semantic search)",
+        "• Монгол/Англи хоёуланг ойлгох",
+      ].join("\n")
+    : [
+        "What I can help with:",
+        "AI",
+        "",
+        "• Search books by title or author",
+        "• Borrow or request books",
+        "• Show your current loans",
+        "• Recommend books based on your genres",
+        "• Find books even with typos (fuzzy search)",
+        "• Search by meaning (semantic search)",
+        "• Understand both Mongolian and English",
+      ].join("\n");
+
+const buildSignInReply = (language: AssistantLanguage) =>
+  language === "mn"
+    ? "Энэ үйлдлийг хийхийн тулд эхлээд нэвтэрнэ үү."
+    : "Please sign in first so I can do that for your account.";
+
+const buildBackendUnavailableReply = (language: AssistantLanguage) =>
+  language === "mn"
+    ? "AI library backend одоогоор бүрэн холбогдохгүй байна. Түр хүлээгээд дахин оролдоно уу."
+    : "The AI library backend is not fully available right now. Please try again shortly.";
+
+const formatBookLine = (book: CatalogBook, language: AssistantLanguage) =>
+  `• ${book.title} — ${book.author} (${book.genre}, ${book.available_copies}/${book.total_copies} ${
+    language === "mn" ? "боломжтой" : "available"
+  })`;
+
+const hasReadableContent = (book: CatalogBook) =>
+  Boolean(book.is_public_readable) ||
+  Boolean(book.reading_content?.some((section) => section.trim().length >= 80));
+
+const scoreBookCandidate = (book: CatalogBook, query: string) => {
+  const normalizedQuery = normalizeAssistantText(query);
+  const title = normalizeAssistantText(book.title);
+  const author = normalizeAssistantText(book.author);
+  const genre = normalizeAssistantText(book.genre);
+  const description = normalizeAssistantText(book.description);
+
+  let score = 0;
+
+  if (title === normalizedQuery) score += 120;
+  if (title.includes(normalizedQuery)) score += 90;
+  if (normalizedQuery.includes(title)) score += 70;
+  if (author === normalizedQuery) score += 80;
+  if (author.includes(normalizedQuery) || normalizedQuery.includes(author)) score += 55;
+  if (genre.includes(normalizedQuery) || normalizedQuery.includes(genre)) score += 35;
+  if (description.includes(normalizedQuery)) score += 20;
+  if (book.available_copies > 0) score += 8;
+
+  return score;
+};
+
+const pickBestBook = (books: CatalogBook[], query: string) =>
+  [...books].sort((left, right) => scoreBookCandidate(right, query) - scoreBookCandidate(left, query))[0] ?? null;
+
+const pickBestLoan = (loans: LoanRow[], query: string) =>
+  [...loans].sort((left, right) => scoreBookCandidate(right.book, query) - scoreBookCandidate(left.book, query))[0] ?? null;
+
+const buildSearchReply = (query: string, books: CatalogBook[], language: AssistantLanguage) => {
+  if (!books.length) {
+    return language === "mn"
+      ? `Каталогоос "${query}"-тэй ойролцоо ном олдсонгүй. Гарчиг, зохиолч, эсвэл сэдвээр нь арай өөрөөр асуугаад үзээрэй.`
+      : `I could not find a catalog match for "${query}". Try another title, author, or topic.`;
+  }
+
+  return [
+    language === "mn"
+      ? `Каталогоос "${query}"-д тохирох дараах номуудыг оллоо:`
+      : `I found these catalog matches for "${query}":`,
+    ...books.map((book) => formatBookLine(book, language)),
+    language === "mn"
+      ? 'Хүсвэл "зээлэх <номын нэр>" эсвэл "захиалах <номын нэр>" гэж үргэлжлүүлж болно.'
+      : 'If you want one, say "borrow <title>" or "request <title>".',
+  ].join("\n");
+};
+
+const buildLoansReply = (loans: LoanRow[], language: AssistantLanguage) => {
+  if (!loans.length) {
+    return language === "mn"
+      ? "Танд одоогоор идэвхтэй эсвэл захиалсан ном алга."
+      : "You do not have any active or requested books right now.";
+  }
+
+  return [
+    language === "mn" ? "Таны одоогийн loans:" : "Here are your current loans:",
+    ...loans.map((loan) => {
+      const statusLabel =
+        loan.status === "requested"
+          ? language === "mn"
+            ? "захиалсан"
+            : "requested"
+          : language === "mn"
+            ? "идэвхтэй"
+            : "active";
+
+      const duePart =
+        loan.status === "active"
+          ? language === "mn"
+            ? ` • буцаах: ${new Date(loan.due_date).toLocaleDateString("mn-MN")}`
+            : ` • due: ${new Date(loan.due_date).toLocaleDateString("en-US")}`
+          : "";
+
+      return `• ${loan.book.title} — ${loan.book.author} (${statusLabel}${duePart})`;
+    }),
+  ].join("\n");
+};
+
+const buildActionErrorReply = (error: unknown, language: AssistantLanguage) => {
+  const message = error instanceof Error ? error.message : String(error ?? "Unknown error");
+
+  if (STALE_AUTH_SESSION_PATTERN.test(message)) {
+    return language === "mn"
+      ? "Таны session хуучирсан байна. Дахин нэвтэрч ороод оролдоно уу."
+      : "Your session has expired. Please sign in again and try once more.";
+  }
+
+  if (/Not authenticated/i.test(message)) {
+    return buildSignInReply(language);
+  }
+
+  if (/No copies available/i.test(message)) {
+    return language === "mn"
+      ? "Энэ номын боломжит хувь дууссан байна."
+      : "There are no available copies for this book right now.";
+  }
+
+  if (/Book is currently available/i.test(message)) {
+    return language === "mn"
+      ? "Энэ ном одоогоор боломжтой байна. Шууд зээлж болно."
+      : "This book is available right now, so it can be borrowed directly.";
+  }
+
+  if (/already borrowed/i.test(message)) {
+    return language === "mn"
+      ? "Та энэ номыг аль хэдийн идэвхтэй зээлсэн байна."
+      : "You already have this book borrowed.";
+  }
+
+  if (/already requested/i.test(message)) {
+    return language === "mn"
+      ? "Та энэ номыг аль хэдийн захиалсан байна."
+      : "You already requested this book.";
+  }
+
+  if (/Loan not found/i.test(message)) {
+    return language === "mn"
+      ? "Зээлийн мэдээлэл олдсонгүй."
+      : "I could not find that loan.";
+  }
+
+  if (/Book not found/i.test(message)) {
+    return language === "mn"
+      ? "Номын мэдээлэл олдсонгүй."
+      : "I could not find that book.";
+  }
+
+  if (/Could not find the function public\.(borrow_book|request_book|return_book)/i.test(message)) {
+    return language === "mn"
+      ? "Backend migration дутуу байна. Supabase migration-уудаа apply хийсний дараа дахин оролдоно уу."
+      : "The backend migrations are out of date. Apply the latest Supabase migrations and try again.";
+  }
+
+  return language === "mn" ? `Алдаа гарлаа: ${message}` : `I ran into an error: ${message}`;
+};
+
+const getSupabaseClients = (req: Request) => {
+  const supabaseUrl = getEnv("SUPABASE_URL");
+  const serviceRole = getEnv("SUPABASE_SECRET_KEY") ?? getEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const anonKey = getEnv("SUPABASE_ANON_KEY");
+
+  if (!supabaseUrl || !serviceRole) {
+    throw new Error(
+      "Chat function is missing required Supabase secrets. Set SUPABASE_URL and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY).",
+    );
+  }
+
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const serviceClient = createClient(supabaseUrl, serviceRole);
+  const userClient = anonKey
+    ? createClient(supabaseUrl, anonKey, {
+        global: {
+          headers: authHeader ? { Authorization: authHeader } : {},
         },
-        { status: 500 },
-      );
+      })
+    : null;
+
+  return { supabaseUrl, serviceClient, userClient };
+};
+
+const getAuthenticatedUser = async (userClient: SupabaseClient | null) => {
+  if (!userClient) {
+    return null;
+  }
+
+  const {
+    data: { user },
+    error,
+  } = await userClient.auth.getUser();
+
+  if (error || !user) {
+    return null;
+  }
+
+  return user;
+};
+
+const fetchLoans = async ({
+  userClient,
+  userId,
+  statuses,
+  limit,
+}: {
+  userClient: SupabaseClient;
+  userId: string;
+  statuses: LoanStatus[];
+  limit: number;
+}) => {
+  let query = userClient
+    .from("loans")
+    .select("id, status, due_date, book:books(*)")
+    .eq("user_id", userId)
+    .order("loaned_at", { ascending: false });
+
+  if (statuses.length === 1) {
+    query = query.eq("status", statuses[0]);
+  } else if (statuses.length > 1) {
+    query = query.in("status", statuses);
+  }
+
+  if (limit > 0) {
+    query = query.limit(limit);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as unknown as LoanRow[];
+};
+
+const fetchRecommendationGenres = async ({
+  userClient,
+  user,
+}: {
+  userClient: SupabaseClient | null;
+  user: User | null;
+}) => {
+  const genreSet = new Set<string>();
+
+  if (!userClient || !user) {
+    return genreSet;
+  }
+
+  const { data: profile } = await userClient
+    .from("profiles")
+    .select("preferred_genres")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  for (const genre of ((profile as ProfileRow | null)?.preferred_genres ?? [])) {
+    const normalized = genre?.trim();
+
+    if (normalized) {
+      genreSet.add(normalized);
+    }
+  }
+
+  const { data: loans } = await userClient
+    .from("loans")
+    .select("book:books(genre)")
+    .eq("user_id", user.id)
+    .limit(20);
+
+  for (const loan of (loans ?? []) as Array<{ book: { genre: string | null } | null }>) {
+    const genre = loan.book?.genre?.trim();
+
+    if (genre) {
+      genreSet.add(genre);
+    }
+  }
+
+  return genreSet;
+};
+
+const buildRecommendationReply = async ({
+  serviceClient,
+  userClient,
+  user,
+  language,
+  query,
+  lovableApiKey,
+}: {
+  serviceClient: SupabaseClient;
+  userClient: SupabaseClient | null;
+  user: User | null;
+  language: AssistantLanguage;
+  query: string;
+  lovableApiKey?: string | null;
+}) => {
+  if (query) {
+    const books = await searchCatalogBooks({
+      supabase: serviceClient,
+      query,
+      lovableApiKey,
+      limit: 4,
+    });
+
+    if (!books.length) {
+      return language === "mn"
+        ? `"${query}" чиглэлээр санал болгох ном олдсонгүй. Өөр genre эсвэл сэдэв хэлээд үзээрэй.`
+        : `I could not find a recommendation set for "${query}". Try another genre or topic.`;
     }
 
+    return [
+      language === "mn"
+        ? `"${query}" чиглэлээр танд тохирох номууд:`
+        : `Here are a few books for "${query}":`,
+      ...books.map((book) => formatBookLine(book, language)),
+    ].join("\n");
+  }
+
+  const preferredGenres = await fetchRecommendationGenres({ userClient, user });
+  const genres = Array.from(preferredGenres);
+
+  const { data, error } = await serviceClient
+    .from("books")
+    .select("*")
+    .gt("available_copies", 0)
+    .limit(80);
+
+  if (error) {
+    throw error;
+  }
+
+  const books = ((data ?? []) as CatalogBook[])
+    .map((book) => ({
+      book,
+      score: (genres.includes(book.genre) ? 100 : 0) + book.available_copies,
+    }))
+    .sort((left, right) => right.score - left.score)
+    .map((entry) => entry.book)
+    .slice(0, 4);
+
+  if (!books.length) {
+    return language === "mn"
+      ? "Одоогоор recommendation гаргахад хангалттай catalog data алга."
+      : "There is not enough catalog data to build recommendations right now.";
+  }
+
+  return [
+    genres.length
+      ? language === "mn"
+        ? `Таны сонирхдог genre дээр тулгуурласан санал: ${genres.slice(0, 3).join(", ")}`
+        : `Recommendations shaped by your genres: ${genres.slice(0, 3).join(", ")}`
+      : language === "mn"
+        ? "Одоогийн каталогоос санал болгож болох номууд:"
+        : "Here are a few books from the current catalog:",
+    ...books.map((book) => formatBookLine(book, language)),
+  ].join("\n");
+};
+
+const buildHandledReply = async ({
+  intent,
+  language,
+  serviceClient,
+  userClient,
+  user,
+  lovableApiKey,
+}: {
+  intent: AssistantIntent;
+  language: AssistantLanguage;
+  serviceClient: SupabaseClient;
+  userClient: SupabaseClient | null;
+  user: User | null;
+  lovableApiKey?: string | null;
+}) => {
+  switch (intent.kind) {
+    case "capabilities":
+      return buildCapabilitiesReply(language);
+    case "search": {
+      const books = await searchCatalogBooks({
+        supabase: serviceClient,
+        query: intent.query,
+        lovableApiKey,
+        limit: 4,
+      });
+      return buildSearchReply(intent.query, books, language);
+    }
+    case "loans": {
+      if (!userClient || !user) {
+        return buildSignInReply(language);
+      }
+
+      const loans = await fetchLoans({
+        userClient,
+        userId: user.id,
+        statuses: ["active", "requested"],
+        limit: 8,
+      });
+      return buildLoansReply(loans, language);
+    }
+    case "recommend":
+      return await buildRecommendationReply({
+        serviceClient,
+        userClient,
+        user,
+        language,
+        query: intent.query,
+        lovableApiKey,
+      });
+    case "borrow":
+    case "request": {
+      if (!userClient || !user) {
+        return buildSignInReply(language);
+      }
+
+      if (!intent.query) {
+        return language === "mn"
+          ? `Ямар ном ${intent.kind === "borrow" ? "зээлэх" : "захиалах"} гэж байгаагаа нэрээр нь хэлээрэй.`
+          : `Tell me which title you want to ${intent.kind}.`;
+      }
+
+      const books = await searchCatalogBooks({
+        supabase: serviceClient,
+        query: intent.query,
+        lovableApiKey,
+        limit: 5,
+      });
+      const book = pickBestBook(books, intent.query);
+
+      if (!book) {
+        return language === "mn"
+          ? `"${intent.query}" нэртэй ном каталогоос олдсонгүй.`
+          : `I could not find "${intent.query}" in the catalog.`;
+      }
+
+      if (hasReadableContent(book)) {
+        return language === "mn"
+          ? `"${book.title}" нь site дээр шууд уншигддаг ном байна. Card дээрээс нь "Read on site" гэж нээгээд үргэлжлүүлж болно.`
+          : `"${book.title}" is already available to read on site. You can open it directly from the catalog card.`;
+      }
+
+      const actualKind = book.available_copies > 0 ? "borrow" : "request";
+      const rpcName = actualKind === "borrow" ? "borrow_book" : "request_book";
+      const { error } = await userClient.rpc(rpcName, { p_book_id: book.id });
+
+      if (error) {
+        return buildActionErrorReply(error, language);
+      }
+
+      if (actualKind === "borrow") {
+        return intent.kind === "request"
+          ? language === "mn"
+            ? `"${book.title}" одоо боломжтой байсан тул танд шууд зээллээ.`
+            : `"${book.title}" was available, so I borrowed it for you right away.`
+          : language === "mn"
+            ? `"${book.title}" амжилттай зээлэгдлээ.`
+            : `"${book.title}" has been borrowed successfully.`;
+      }
+
+      return intent.kind === "borrow"
+        ? language === "mn"
+          ? `"${book.title}" одоогоор боломжгүй тул захиалга болгон бүртгэлээ.`
+          : `"${book.title}" is not available right now, so I placed a request instead.`
+        : language === "mn"
+          ? `"${book.title}" захиалгад орлоо. Боломжтой болмогц идэвхжинэ.`
+          : `"${book.title}" has been requested and will activate when it becomes available.`;
+    }
+    case "return": {
+      if (!userClient || !user) {
+        return buildSignInReply(language);
+      }
+
+      const loans = await fetchLoans({
+        userClient,
+        userId: user.id,
+        statuses: ["active"],
+        limit: 20,
+      });
+
+      if (!loans.length) {
+        return language === "mn"
+          ? "Буцаах идэвхтэй ном алга."
+          : "You do not have any active books to return.";
+      }
+
+      if (!intent.query && loans.length > 1) {
+        return [
+          language === "mn"
+            ? "Ямар ном буцаахаа тодруулна уу. Одоогоор танд эдгээр идэвхтэй номууд байна:"
+            : "Tell me which title to return. These are your current active books:",
+          ...loans.slice(0, 5).map((loan) => `• ${loan.book.title} — ${loan.book.author}`),
+        ].join("\n");
+      }
+
+      const loan = intent.query ? pickBestLoan(loans, intent.query) : loans[0];
+
+      if (!loan) {
+        return language === "mn"
+          ? `"${intent.query}" нэртэй идэвхтэй зээл олдсонгүй.`
+          : `I could not find an active loan for "${intent.query}".`;
+      }
+
+      const { error } = await userClient.rpc("return_book", { p_loan_id: loan.id });
+
+      if (error) {
+        return buildActionErrorReply(error, language);
+      }
+
+      return language === "mn"
+        ? `"${loan.book.title}" амжилттай буцаагдлаа.`
+        : `"${loan.book.title}" has been returned successfully.`;
+    }
+    case "unknown":
+    default:
+      return null;
+  }
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const lovableApiKey = getEnv("LOVABLE_API_KEY");
+    const { serviceClient, userClient } = getSupabaseClients(req);
+    const user = await getAuthenticatedUser(userClient);
     const { messages } = await req.json() as { messages: ChatMessage[] };
     const lastUser = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    const language = detectLanguage(lastUser);
+    const intent = detectAssistantIntent(lastUser);
+
+    if (intent.kind !== "unknown") {
+      try {
+        const reply = await buildHandledReply({
+          intent,
+          language,
+          serviceClient,
+          userClient,
+          user,
+          lovableApiKey,
+        });
+
+        if (reply) {
+          return jsonResponse({ reply });
+        }
+      } catch (error) {
+        console.error("chat capability error", error);
+        return jsonResponse({ reply: buildActionErrorReply(error, language) });
+      }
+    }
+
+    if (!lovableApiKey) {
+      return jsonResponse({ reply: buildBackendUnavailableReply(language) });
+    }
 
     let context = "";
 
     try {
-      const supa = createClient(supabaseUrl, serviceRole);
-      const { data: matches } = await supa.rpc("search_books_fuzzy", { q: lastUser, lim: 8 });
-      const books = [...((matches ?? []) as CatalogBook[])];
-
-      if (books.length < 4) {
-        const { data: extra } = await supa.from("books").select("*").limit(8);
-        const seen = new Set(books.map((book) => book.id));
-
-        for (const book of ((extra ?? []) as CatalogBook[])) {
-          if (!seen.has(book.id)) {
-            seen.add(book.id);
-            books.push(book);
-          }
-        }
-      }
+      const books = await searchCatalogBooks({
+        supabase: serviceClient,
+        query: lastUser,
+        lovableApiKey,
+        limit: 8,
+      });
 
       if (books.length) {
-        context = "Available books in the Aetheria catalog (use these when recommending):\n" +
+        context = "Available books in the Aetheria catalog:\n" +
           books
             .slice(0, 10)
             .map(
@@ -107,11 +947,17 @@ Deno.serve(async (req) => {
     }
 
     const systemMessages: ChatMessage[] = [{ role: "system", content: SYSTEM_PROMPT }];
-    if (context) systemMessages.push({ role: "system", content: context });
+
+    if (context) {
+      systemMessages.push({ role: "system", content: context });
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: { Authorization: `Bearer ${lovableApiKey}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${lovableApiKey}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [...systemMessages, ...messages],
@@ -121,23 +967,20 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       if (response.status === 429) {
-        return jsonResponse({ error: "Too many requests were sent to the AI service. Please try again shortly." }, {
-          status: 429,
-        });
+        return jsonResponse(
+          { error: "Too many requests were sent to the AI service. Please try again shortly." },
+          { status: 429 },
+        );
       }
 
       if (response.status === 402) {
-        return jsonResponse({ error: "AI credit is currently unavailable." }, {
-          status: 402,
-        });
+        return jsonResponse({ error: "AI credit is currently unavailable." }, { status: 402 });
       }
 
       const text = await response.text();
       console.error("AI gateway error:", response.status, text);
 
-      return jsonResponse({ error: "The AI service returned an error." }, {
-        status: 500,
-      });
+      return jsonResponse({ error: "The AI service returned an error." }, { status: 500 });
     }
 
     return new Response(response.body, {
@@ -145,8 +988,6 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error("chat error", error);
-    return jsonResponse({ error: error instanceof Error ? error.message : "Unknown" }, {
-      status: 500,
-    });
+    return jsonResponse({ error: error instanceof Error ? error.message : "Unknown" }, { status: 500 });
   }
 });
