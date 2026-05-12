@@ -31,6 +31,19 @@ type ReaderViewport = {
   height: number;
 };
 
+type ReaderTextMode = "original" | "mn";
+
+type PublicDomainTextResponse = {
+  error?: string;
+  sections?: string[];
+  sourceUrl?: string;
+  readerUrl?: string;
+  fallback?: boolean;
+  message?: string;
+  translated?: boolean;
+  displayLanguage?: ReaderTextMode;
+};
+
 const getViewport = (): ReaderViewport => {
   if (typeof window === "undefined") {
     return { width: 1366, height: 900 };
@@ -174,6 +187,8 @@ const Reader = () => {
   const [fullTextLoaded, setFullTextLoaded] = useState(false);
   const [fullTextSourceUrl, setFullTextSourceUrl] = useState("");
   const [fullTextErrorMessage, setFullTextErrorMessage] = useState("");
+  const [readerTextMode, setReaderTextMode] = useState<ReaderTextMode>("mn");
+  const [displayLanguage, setDisplayLanguage] = useState("en");
   const [viewport, setViewport] = useState<ReaderViewport>(getViewport);
   const [pageIndex, setPageIndex] = useState(0);
 
@@ -240,21 +255,41 @@ const Reader = () => {
 
   useEffect(() => {
     if (!book) {
+      setReaderTextMode("mn");
+      setDisplayLanguage("en");
+      return;
+    }
+
+    if (book.language === "mn" || !hasPublicDomainTextSource(book)) {
+      setReaderTextMode("original");
+      setDisplayLanguage(book.language);
+      return;
+    }
+
+    setReaderTextMode("mn");
+    setDisplayLanguage("mn");
+  }, [book]);
+
+  useEffect(() => {
+    if (!book) {
       setDisplaySections([]);
       setFullTextLoaded(false);
       setFullTextLoading(false);
       setFullTextSourceUrl("");
       setFullTextErrorMessage("");
+      setDisplayLanguage("en");
       return;
     }
 
     let canceled = false;
     const previewSections = buildReadingSections(book);
+    const translationRequested = readerTextMode === "mn" && book.language !== "mn";
 
-    setDisplaySections(previewSections);
+    setDisplaySections(translationRequested ? [] : previewSections);
     setFullTextLoaded(false);
     setFullTextSourceUrl("");
     setFullTextErrorMessage("");
+    setDisplayLanguage(translationRequested ? "mn" : book.language);
 
     if (!hasPublicDomainTextSource(book)) {
       setFullTextLoading(false);
@@ -265,15 +300,12 @@ const Reader = () => {
       setFullTextLoading(true);
 
       try {
-        const response = await fetch(getPublicDomainTextApiPath(book));
-        const data = (await response.json()) as {
-          error?: string;
-          sections?: string[];
-          sourceUrl?: string;
-          readerUrl?: string;
-          fallback?: boolean;
-          message?: string;
-        };
+        const response = await fetch(
+          getPublicDomainTextApiPath(book, {
+            language: translationRequested ? "mn" : "original",
+          }),
+        );
+        const data = (await response.json()) as PublicDomainTextResponse;
 
         if (!response.ok) {
           throw new Error(data.error || "Full reader text could not be loaded.");
@@ -283,10 +315,13 @@ const Reader = () => {
           setDisplaySections(data.sections);
           setFullTextLoaded(!data.fallback);
           setFullTextSourceUrl(data.sourceUrl || data.readerUrl || "");
-          setFullTextErrorMessage(data.fallback ? data.message || "Built-in preview text is being used right now." : "");
+          setDisplayLanguage(data.displayLanguage === "mn" ? "mn" : book.language);
+          setFullTextErrorMessage(data.message || "");
         }
       } catch (error) {
         if (!canceled) {
+          setDisplaySections(previewSections);
+          setDisplayLanguage(book.language);
           setFullTextErrorMessage(error instanceof Error ? error.message : "Full reader text could not be loaded.");
         }
       } finally {
@@ -301,10 +336,12 @@ const Reader = () => {
     return () => {
       canceled = true;
     };
-  }, [book]);
+  }, [book, readerTextMode]);
 
   const publicDomainReaderUrl = book ? getPublicDomainReaderUrl(book) : null;
   const hasBuiltInReader = book ? canReadBookNow(book) : false;
+  const translationAvailable = Boolean(book && hasPublicDomainTextSource(book) && book.language !== "mn");
+  const isShowingMongolianText = displayLanguage === "mn" || book?.language === "mn";
   const readerLayout = useMemo(
     () => getReaderLayout(viewport.width, viewport.height),
     [viewport.height, viewport.width],
@@ -335,7 +372,7 @@ const Reader = () => {
 
   useEffect(() => {
     setPageIndex(0);
-  }, [book?.id, fullTextLoaded]);
+  }, [book?.id, fullTextLoaded, readerTextMode]);
 
   useEffect(() => {
     setPageIndex((current) => {
@@ -474,7 +511,7 @@ const Reader = () => {
 
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Languages className="size-4" />
-                  <span>{book.language === "mn" ? "Mongolian reader" : "English reader"}</span>
+                  <span>{isShowingMongolianText ? "Mongolian text view" : "Original text view"}</span>
                 </div>
 
                 <div className="flex flex-wrap gap-2 text-xs">
@@ -542,22 +579,63 @@ const Reader = () => {
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-sm">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Layout</p>
-                    <p className="mt-1 font-medium text-foreground">
-                      {visiblePageCount === 2 ? "Two-page spread" : "Single-page focus"}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {visiblePageCount === 2
-                        ? "Wider screens show facing pages like an open book."
-                        : "Compact screens keep one page at a time for comfort."}
-                    </p>
+                  <div className="space-y-3">
+                    {translationAvailable ? (
+                      <div className="rounded-2xl border border-primary/20 bg-background/45 px-4 py-3 text-sm">
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Text Language</p>
+                        <div className="mt-3 inline-flex rounded-full border border-border/70 bg-background/60 p-1">
+                          <button
+                            type="button"
+                            onClick={() => setReaderTextMode("mn")}
+                            className={cn(
+                              "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                              readerTextMode === "mn"
+                                ? "bg-primary text-primary-foreground shadow-glow-primary"
+                                : "text-muted-foreground hover:text-foreground",
+                            )}
+                          >
+                            Mongolian
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReaderTextMode("original")}
+                            className={cn(
+                              "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                              readerTextMode === "original"
+                                ? "bg-primary text-primary-foreground shadow-glow-primary"
+                                : "text-muted-foreground hover:text-foreground",
+                            )}
+                          >
+                            Original
+                          </button>
+                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          AI can translate this public-domain edition into Mongolian while keeping the original version one tap away.
+                        </p>
+                      </div>
+                    ) : null}
+
+                    <div className="rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-sm">
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Layout</p>
+                      <p className="mt-1 font-medium text-foreground">
+                        {visiblePageCount === 2 ? "Two-page spread" : "Single-page focus"}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {visiblePageCount === 2
+                          ? "Wider screens show facing pages like an open book."
+                          : "Compact screens keep one page at a time for comfort."}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {displaySections.length ? (
-                <ReaderVoiceControls sections={displaySections} language={book.language} className="mt-5" />
+                <ReaderVoiceControls
+                  sections={displaySections}
+                  language={displayLanguage === "mn" ? "mn" : book.language}
+                  className="mt-5"
+                />
               ) : null}
 
               <section className="mt-8 overflow-hidden rounded-[32px] border border-border/50 bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.08),transparent_36%),linear-gradient(180deg,rgba(10,15,19,0.8),rgba(9,13,17,0.96))] p-3 shadow-cinematic sm:p-5">
@@ -566,7 +644,9 @@ const Reader = () => {
                     <p className="text-xs uppercase tracking-[0.24em] text-primary/80">Book Pages</p>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
                       {fullTextLoading
-                        ? "Loading the full in-site edition and repaginating it now..."
+                        ? readerTextMode === "mn"
+                          ? "Preparing the Mongolian edition and repaginating it now..."
+                          : "Loading the full in-site edition and repaginating it now..."
                         : fullTextLoaded
                           ? "The full book is now arranged into pages directly inside Aetheria."
                           : hasBuiltInReader
@@ -574,9 +654,7 @@ const Reader = () => {
                             : "The preview text is being shown in pages while a full digital source is not linked yet."}
                     </p>
                     {fullTextErrorMessage ? (
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Full book load is unavailable right now, so Aetheria is showing the available in-site text instead.
-                      </p>
+                      <p className="mt-2 text-sm text-muted-foreground">{fullTextErrorMessage}</p>
                     ) : null}
                   </div>
 

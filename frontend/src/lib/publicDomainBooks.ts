@@ -77,8 +77,23 @@ export const getPublicDomainFallbackSections = (book: Pick<Book, "title" | "auth
   return fallbackBook?.reading_content?.filter((section) => section.trim().length > 0) ?? null;
 };
 
-export const getPublicDomainTextApiPath = (book: Pick<Book, "title" | "author">) =>
-  `/api/public-domain-text?title=${encodeURIComponent(book.title)}&author=${encodeURIComponent(book.author)}`;
+export const getPublicDomainTextApiPath = (
+  book: Pick<Book, "title" | "author">,
+  options: {
+    language?: "original" | "mn";
+  } = {},
+) => {
+  const searchParams = new URLSearchParams({
+    title: book.title,
+    author: book.author,
+  });
+
+  if (options.language && options.language !== "original") {
+    searchParams.set("language", options.language);
+  }
+
+  return `/api/public-domain-text?${searchParams.toString()}`;
+};
 
 export const getPublicDomainDownloadApiPath = (book: Pick<Book, "id">) =>
   `/api/book-download?bookId=${encodeURIComponent(book.id)}`;

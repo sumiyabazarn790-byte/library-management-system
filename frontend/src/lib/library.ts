@@ -693,8 +693,12 @@ export const getBookReaderPath = (book: Pick<Book, "id">) => `/reader/${encodeUR
 export const hasPublicDomainTextSource = (book: Pick<Book, "title" | "author">) =>
   resolveHasPublicDomainSource(book);
 
-export const getPublicDomainTextApiPath = (book: Pick<Book, "title" | "author">) =>
-  resolvePublicDomainTextApiPath(book);
+export const getPublicDomainTextApiPath = (
+  book: Pick<Book, "title" | "author">,
+  options?: {
+    language?: "original" | "mn";
+  },
+) => resolvePublicDomainTextApiPath(book, options);
 
 export const hasBookDownloadSource = (book: Pick<Book, "title" | "author">) =>
   resolveHasPublicDomainSource(book);

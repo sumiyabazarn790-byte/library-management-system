@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { NextResponse } from "next/server";
 import {
   getPublicDomainFallbackSections,
@@ -7,18 +9,55 @@ import {
 
 export const runtime = "nodejs";
 
+type SourceBook = {
+  title: string;
+  author: string;
+};
+
+type RequestedReaderLanguage = "original" | "mn";
+
+type TranslationResult = {
+  sections: string[];
+  translated: boolean;
+  displayLanguage: RequestedReaderLanguage;
+  message?: string;
+};
+
 const MIN_FULL_TEXT_LENGTH = 2500;
 const MAX_SECTION_LENGTH = 1600;
 const MAX_SECTIONS = 180;
 const TEXT_FETCH_TIMEOUT_MS = 3500;
+const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_OPENAI_TRANSLATE_MODEL = "gpt-4.1-mini";
+const MAX_TRANSLATION_BATCH_SECTIONS = 12;
+const MAX_TRANSLATION_BATCH_CHARS = 7200;
 const TEXT_HEADERS = {
   Accept: "text/plain; charset=utf-8",
   "User-Agent": "Aetheria Reader/1.0",
 };
 
+const LOCAL_ENV_CANDIDATES = [
+  path.join(process.cwd(), ".env.local"),
+  path.join(process.cwd(), ".env"),
+  path.join(process.cwd(), "..", "backend", ".env"),
+];
+
 const GUTENBERG_START_PATTERNS = [/^\*{3}\s*start of/i, /^start of (?:the|this) project gutenberg/i];
 const GUTENBERG_END_PATTERNS = [/^\*{3}\s*end of/i, /^end of (?:the|this) project gutenberg/i];
 const SECTION_HEADING_PATTERN = /^(chapter|book|part|letter|preface|introduction|prologue|epilogue)\b/i;
+
+const envFileCache = new Map<string, Map<string, string>>();
+const translationCache = (
+  globalThis as typeof globalThis & {
+    __aetheriaReaderTranslationCache?: Map<string, string[]>;
+  }
+).__aetheriaReaderTranslationCache ?? new Map<string, string[]>();
+
+(
+  globalThis as typeof globalThis & {
+    __aetheriaReaderTranslationCache?: Map<string, string[]>;
+  }
+).__aetheriaReaderTranslationCache = translationCache;
 
 const normalizeText = (value: string) =>
   value
@@ -27,6 +66,87 @@ const normalizeText = (value: string) =>
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+
+const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, "");
+
+const mergeMessages = (...messages: Array<string | undefined>) =>
+  messages
+    .map((message) => message?.trim())
+    .filter((message): message is string => Boolean(message))
+    .join(" ");
+
+const parseEnvFile = (filePath: string) => {
+  const cached = envFileCache.get(filePath);
+  if (cached) {
+    return cached;
+  }
+
+  const parsed = new Map<string, string>();
+
+  try {
+    const contents = readFileSync(filePath, "utf8");
+
+    for (const rawLine of contents.split(/\r?\n/u)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) {
+        continue;
+      }
+
+      const separatorIndex = line.indexOf("=");
+      if (separatorIndex <= 0) {
+        continue;
+      }
+
+      const key = line.slice(0, separatorIndex).trim();
+      let value = line.slice(separatorIndex + 1).trim();
+
+      if (
+        value.length >= 2 &&
+        ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))
+      ) {
+        value = value.slice(1, -1);
+      }
+
+      parsed.set(key, value);
+    }
+  } catch {
+    // Ignore missing local env files and keep looking at the next candidate.
+  }
+
+  envFileCache.set(filePath, parsed);
+  return parsed;
+};
+
+const getPrivateEnv = (key: string) => {
+  const directValue = process.env[key]?.trim();
+  if (directValue) {
+    return directValue;
+  }
+
+  for (const candidatePath of LOCAL_ENV_CANDIDATES) {
+    const candidateValue = parseEnvFile(candidatePath).get(key)?.trim();
+    if (candidateValue) {
+      return candidateValue;
+    }
+  }
+
+  return "";
+};
+
+const parseJsonObject = (value: string) => {
+  const trimmed = value.trim();
+  const rawJson = trimmed.startsWith("{") ? trimmed : trimmed.match(/\{[\s\S]*\}/u)?.[0];
+
+  if (!rawJson) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawJson) as { sections?: unknown };
+  } catch {
+    return null;
+  }
+};
 
 const trimProjectGutenbergBoilerplate = (value: string) => {
   const lines = normalizeText(value).split("\n");
@@ -123,10 +243,202 @@ const readFirstSuccessfulText = async (urls: string[]) => {
   return results.find((value): value is string => Boolean(value)) ?? null;
 };
 
+const chunkSectionsForTranslation = (sections: string[]) => {
+  const batches: string[][] = [];
+  let currentBatch: string[] = [];
+  let currentBatchChars = 0;
+
+  for (const section of sections) {
+    const sectionChars = section.trim().length;
+    const exceedsBatchLimit =
+      currentBatch.length > 0 &&
+      (currentBatch.length >= MAX_TRANSLATION_BATCH_SECTIONS ||
+        currentBatchChars + sectionChars > MAX_TRANSLATION_BATCH_CHARS);
+
+    if (exceedsBatchLimit) {
+      batches.push(currentBatch);
+      currentBatch = [section];
+      currentBatchChars = sectionChars;
+      continue;
+    }
+
+    currentBatch.push(section);
+    currentBatchChars += sectionChars;
+  }
+
+  if (currentBatch.length) {
+    batches.push(currentBatch);
+  }
+
+  return batches;
+};
+
+const buildTranslationCacheKey = (sourceBook: SourceBook, sections: string[]) => {
+  const firstSection = sections[0]?.replace(/\s+/g, " ").slice(0, 140) ?? "";
+  const lastSection = sections.at(-1)?.replace(/\s+/g, " ").slice(-140) ?? "";
+
+  return [
+    sourceBook.author.trim().toLowerCase(),
+    sourceBook.title.trim().toLowerCase(),
+    sections.length,
+    firstSection,
+    lastSection,
+  ].join("::");
+};
+
+const translateSectionBatch = async (sections: string[], sourceBook: SourceBook) => {
+  const openAiApiKey = getPrivateEnv("OPENAI_API_KEY");
+  if (!openAiApiKey) {
+    throw new Error("Missing OPENAI_API_KEY");
+  }
+
+  const openAiBaseUrl = normalizeBaseUrl(getPrivateEnv("OPENAI_BASE_URL") || DEFAULT_OPENAI_BASE_URL);
+  const openAiModel =
+    getPrivateEnv("OPENAI_READER_TRANSLATE_MODEL") ||
+    getPrivateEnv("OPENAI_QUERY_MODEL") ||
+    getPrivateEnv("OPENAI_CHAT_MODEL") ||
+    DEFAULT_OPENAI_TRANSLATE_MODEL;
+
+  const response = await fetch(`${openAiBaseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openAiApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: openAiModel,
+      temperature: 0.2,
+      max_tokens: 7000,
+      response_format: {
+        type: "json_object",
+      },
+      messages: [
+        {
+          role: "system",
+          content:
+            'Translate each array item from English into fluent Mongolian Cyrillic. Preserve the array length, order, headings, numbering, and paragraph meaning. Do not summarize or omit anything. Return JSON only in the form {"sections":["..."]}.',
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            title: sourceBook.title,
+            author: sourceBook.author,
+            sections,
+          }),
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`OpenAI translation failed with ${response.status}: ${errorBody.slice(0, 240)}`);
+  }
+
+  const json = await response.json();
+  const content = json.choices?.[0]?.message?.content;
+  const parsed = typeof content === "string" ? parseJsonObject(content) : null;
+  const translatedSections = Array.isArray(parsed?.sections)
+    ? parsed.sections.filter((value): value is string => typeof value === "string").map((value) => normalizeText(value))
+    : [];
+
+  if (translatedSections.length !== sections.length || translatedSections.some((section) => !section.trim())) {
+    throw new Error("OpenAI translation returned an unexpected section payload.");
+  }
+
+  return translatedSections;
+};
+
+const translateSectionsToMongolian = async (
+  sections: string[],
+  sourceBook: SourceBook,
+): Promise<TranslationResult> => {
+  if (!sections.length) {
+    return {
+      sections,
+      translated: false,
+      displayLanguage: "original",
+    };
+  }
+
+  const cacheKey = buildTranslationCacheKey(sourceBook, sections);
+  const cachedSections = translationCache.get(cacheKey);
+
+  if (cachedSections?.length === sections.length) {
+    return {
+      sections: cachedSections,
+      translated: true,
+      displayLanguage: "mn",
+    };
+  }
+
+  try {
+    const translatedSections: string[] = [];
+
+    for (const batch of chunkSectionsForTranslation(sections)) {
+      translatedSections.push(...(await translateSectionBatch(batch, sourceBook)));
+    }
+
+    translationCache.set(cacheKey, translatedSections);
+
+    return {
+      sections: translatedSections,
+      translated: true,
+      displayLanguage: "mn",
+    };
+  } catch (error) {
+    console.warn("Mongolian reader translation failed", error);
+
+    return {
+      sections,
+      translated: false,
+      displayLanguage: "original",
+      message: "Mongolian translation is unavailable right now, so Aetheria is showing the original text.",
+    };
+  }
+};
+
+const buildResponse = async ({
+  sourceBook,
+  sections,
+  readerUrl,
+  requestedLanguage,
+  fallback = false,
+  message,
+}: {
+  sourceBook: SourceBook;
+  sections: string[];
+  readerUrl: string;
+  requestedLanguage: RequestedReaderLanguage;
+  fallback?: boolean;
+  message?: string;
+}) => {
+  const translation =
+    requestedLanguage === "mn"
+      ? await translateSectionsToMongolian(sections, sourceBook)
+      : {
+          sections,
+          translated: false,
+          displayLanguage: "original" as const,
+        };
+
+  return NextResponse.json({
+    sections: translation.sections,
+    sourceUrl: readerUrl,
+    readerUrl,
+    fallback,
+    requestedLanguage,
+    displayLanguage: translation.displayLanguage,
+    translated: translation.translated,
+    message: mergeMessages(message, translation.message),
+  });
+};
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const title = searchParams.get("title")?.trim() ?? "";
   const author = searchParams.get("author")?.trim() ?? "";
+  const requestedLanguage = searchParams.get("language")?.trim().toLowerCase() === "mn" ? "mn" : "original";
 
   if (!title || !author) {
     return NextResponse.json({ error: "Missing title or author." }, { status: 400 });
@@ -145,10 +457,11 @@ export async function GET(request: Request) {
 
   if (!fullText) {
     if (fallbackSections?.length) {
-      return NextResponse.json({
+      return buildResponse({
+        sourceBook,
         sections: fallbackSections,
-        sourceUrl: readerUrl,
         readerUrl,
+        requestedLanguage,
         fallback: true,
         message: "Original source timed out, so Aetheria is using the built-in preview text for now.",
       });
@@ -161,10 +474,11 @@ export async function GET(request: Request) {
 
   if (!sections.length) {
     if (fallbackSections?.length) {
-      return NextResponse.json({
+      return buildResponse({
+        sourceBook,
         sections: fallbackSections,
-        sourceUrl: readerUrl,
         readerUrl,
+        requestedLanguage,
         fallback: true,
         message: "Original source returned unusable text, so Aetheria is using the built-in preview text for now.",
       });
@@ -173,9 +487,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Reader text was fetched, but no readable sections were found." }, { status: 502 });
   }
 
-  return NextResponse.json({
+  return buildResponse({
+    sourceBook,
     sections,
-    sourceUrl: readerUrl,
     readerUrl,
+    requestedLanguage,
   });
 }

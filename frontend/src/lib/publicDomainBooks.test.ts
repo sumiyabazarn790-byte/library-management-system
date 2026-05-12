@@ -1,6 +1,7 @@
 import {
   getPublicDomainFallbackSections,
   getPublicDomainReaderUrl,
+  getPublicDomainTextApiPath,
   getPublicDomainTextCandidates,
 } from "./publicDomainBooks";
 
@@ -43,5 +44,24 @@ describe("publicDomainBooks helpers", () => {
         author: "Unknown Author",
       }),
     ).toBeNull();
+  });
+
+  it("adds a Mongolian translation hint only when requested", () => {
+    expect(
+      getPublicDomainTextApiPath(
+        {
+          title: "Frankenstein",
+          author: "Mary Shelley",
+        },
+        { language: "mn" },
+      ),
+    ).toContain("language=mn");
+
+    expect(
+      getPublicDomainTextApiPath({
+        title: "Frankenstein",
+        author: "Mary Shelley",
+      }),
+    ).not.toContain("language=");
   });
 });
