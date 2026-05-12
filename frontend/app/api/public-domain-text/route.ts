@@ -31,6 +31,10 @@ const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_OPENAI_TRANSLATE_MODEL = "gpt-4.1-mini";
 const MAX_TRANSLATION_BATCH_SECTIONS = 12;
 const MAX_TRANSLATION_BATCH_CHARS = 7200;
+const GOOGLE_TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single";
+const GOOGLE_TRANSLATE_BATCH_SECTIONS = 6;
+const GOOGLE_TRANSLATE_BATCH_CHARS = 2200;
+const GOOGLE_SECTION_BREAK = "\n\n[[AETHERIA_SECTION_BREAK]]\n\n";
 const TEXT_HEADERS = {
   Accept: "text/plain; charset=utf-8",
   "User-Agent": "Aetheria Reader/1.0",
@@ -74,6 +78,8 @@ const mergeMessages = (...messages: Array<string | undefined>) =>
     .map((message) => message?.trim())
     .filter((message): message is string => Boolean(message))
     .join(" ");
+
+const toErrorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error ?? "Unknown error"));
 
 const parseEnvFile = (filePath: string) => {
   const cached = envFileCache.get(filePath);
@@ -243,7 +249,7 @@ const readFirstSuccessfulText = async (urls: string[]) => {
   return results.find((value): value is string => Boolean(value)) ?? null;
 };
 
-const chunkSectionsForTranslation = (sections: string[]) => {
+const chunkSections = (sections: string[], maxSectionCount: number, maxChars: number) => {
   const batches: string[][] = [];
   let currentBatch: string[] = [];
   let currentBatchChars = 0;
@@ -252,8 +258,7 @@ const chunkSectionsForTranslation = (sections: string[]) => {
     const sectionChars = section.trim().length;
     const exceedsBatchLimit =
       currentBatch.length > 0 &&
-      (currentBatch.length >= MAX_TRANSLATION_BATCH_SECTIONS ||
-        currentBatchChars + sectionChars > MAX_TRANSLATION_BATCH_CHARS);
+      (currentBatch.length >= maxSectionCount || currentBatchChars + sectionChars > maxChars);
 
     if (exceedsBatchLimit) {
       batches.push(currentBatch);
@@ -272,6 +277,12 @@ const chunkSectionsForTranslation = (sections: string[]) => {
 
   return batches;
 };
+
+const chunkSectionsForTranslation = (sections: string[]) =>
+  chunkSections(sections, MAX_TRANSLATION_BATCH_SECTIONS, MAX_TRANSLATION_BATCH_CHARS);
+
+const chunkSectionsForGoogleTranslation = (sections: string[]) =>
+  chunkSections(sections, GOOGLE_TRANSLATE_BATCH_SECTIONS, GOOGLE_TRANSLATE_BATCH_CHARS);
 
 const buildTranslationCacheKey = (sourceBook: SourceBook, sections: string[]) => {
   const firstSection = sections[0]?.replace(/\s+/g, " ").slice(0, 140) ?? "";
@@ -349,6 +360,64 @@ const translateSectionBatch = async (sections: string[], sourceBook: SourceBook)
   return translatedSections;
 };
 
+const extractGoogleTranslatedText = (payload: unknown) => {
+  if (!Array.isArray(payload) || !Array.isArray(payload[0])) {
+    return null;
+  }
+
+  return payload[0]
+    .map((chunk) => (Array.isArray(chunk) && typeof chunk[0] === "string" ? chunk[0] : ""))
+    .join("");
+};
+
+const translateSectionBatchWithGoogle = async (sections: string[]) => {
+  const params = new URLSearchParams({
+    client: "gtx",
+    sl: "en",
+    tl: "mn",
+    dt: "t",
+    q: sections.join(GOOGLE_SECTION_BREAK),
+  });
+
+  const response = await fetch(`${GOOGLE_TRANSLATE_URL}?${params.toString()}`, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "Mozilla/5.0 (compatible; Aetheria Reader/1.0)",
+    },
+    next: { revalidate: 86400 },
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Google translation failed with ${response.status}: ${errorBody.slice(0, 240)}`);
+  }
+
+  const payload = await response.json();
+  const translatedText = extractGoogleTranslatedText(payload);
+
+  if (!translatedText) {
+    throw new Error("Google translation returned an empty payload.");
+  }
+
+  const translatedSections = translatedText.split(GOOGLE_SECTION_BREAK).map((section) => normalizeText(section));
+
+  if (translatedSections.length !== sections.length || translatedSections.some((section) => !section.trim())) {
+    throw new Error("Google translation returned an unexpected section payload.");
+  }
+
+  return translatedSections;
+};
+
+const translateSectionsWithGoogle = async (sections: string[]) => {
+  const translatedSections: string[] = [];
+
+  for (const batch of chunkSectionsForGoogleTranslation(sections)) {
+    translatedSections.push(...(await translateSectionBatchWithGoogle(batch)));
+  }
+
+  return translatedSections;
+};
+
 const translateSectionsToMongolian = async (
   sections: string[],
   sourceBook: SourceBook,
@@ -386,15 +455,28 @@ const translateSectionsToMongolian = async (
       translated: true,
       displayLanguage: "mn",
     };
-  } catch (error) {
-    console.warn("Mongolian reader translation failed", error);
+  } catch (openAiError) {
+    console.warn("OpenAI reader translation failed, trying Google fallback", toErrorMessage(openAiError));
 
-    return {
-      sections,
-      translated: false,
-      displayLanguage: "original",
-      message: "Mongolian translation is unavailable right now, so Aetheria is showing the original text.",
-    };
+    try {
+      const translatedSections = await translateSectionsWithGoogle(sections);
+      translationCache.set(cacheKey, translatedSections);
+
+      return {
+        sections: translatedSections,
+        translated: true,
+        displayLanguage: "mn",
+      };
+    } catch (googleError) {
+      console.warn("Google reader translation fallback failed", toErrorMessage(googleError));
+
+      return {
+        sections,
+        translated: false,
+        displayLanguage: "original",
+        message: "Mongolian translation is unavailable right now, so Aetheria is showing the original text.",
+      };
+    }
   }
 };
 
