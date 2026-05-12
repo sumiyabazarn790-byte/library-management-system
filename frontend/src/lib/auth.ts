@@ -1,4 +1,5 @@
 const LOCAL_SITE_URL = "http://localhost:3000/";
+export const DEFAULT_POST_LOGIN_PATH = "/app#browse";
 
 const normalizeBaseUrl = (value: string) => {
   const withProtocol =
@@ -43,6 +44,38 @@ export const getSiteUrl = () => {
 
 export const buildAuthRedirectUrl = (path = "/", baseUrl = getSiteUrl()) =>
   new URL(path.replace(/^\//, ""), baseUrl).toString();
+
+const isSafeInternalPath = (value: string) => value.startsWith("/") && !value.startsWith("//");
+
+export const resolvePostLoginPath = (nextPath?: string | null, fallback = DEFAULT_POST_LOGIN_PATH) => {
+  const trimmed = nextPath?.trim();
+
+  if (!trimmed || !isSafeInternalPath(trimmed)) {
+    return fallback;
+  }
+
+  return trimmed;
+};
+
+export const buildSignInPath = (nextPath = DEFAULT_POST_LOGIN_PATH) => {
+  const resolvedNextPath = resolvePostLoginPath(nextPath);
+
+  if (resolvedNextPath === DEFAULT_POST_LOGIN_PATH) {
+    return "/auth";
+  }
+
+  return `/auth?next=${encodeURIComponent(resolvedNextPath)}`;
+};
+
+export const buildAuthCallbackPath = (nextPath = DEFAULT_POST_LOGIN_PATH) => {
+  const resolvedNextPath = resolvePostLoginPath(nextPath);
+
+  if (resolvedNextPath === DEFAULT_POST_LOGIN_PATH) {
+    return "/auth/callback";
+  }
+
+  return `/auth/callback?next=${encodeURIComponent(resolvedNextPath)}`;
+};
 
 export const getAuthCallbackError = () => {
   if (typeof window === "undefined") {

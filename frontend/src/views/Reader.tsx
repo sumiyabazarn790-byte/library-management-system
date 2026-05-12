@@ -9,9 +9,11 @@ import {
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { TopNav } from "@/components/aetheria/TopNav";
 import { ReaderVoiceControls } from "@/components/aetheria/ReaderVoiceControls";
+import { useAuth } from "@/contexts/AuthContext";
+import { buildSignInPath } from "@/lib/auth";
 import { getBookCover } from "@/lib/bookCovers";
 import {
   buildReadingSections,
@@ -160,8 +162,10 @@ const paginateReaderSections = (
 };
 
 const Reader = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const { bookId = "" } = useParams();
+  const { user, loading: authLoading } = useAuth();
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -187,6 +191,17 @@ const Reader = () => {
   }, []);
 
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
+    if (!user) {
+      setBook(null);
+      setLoading(false);
+      setErrorMessage("");
+      return;
+    }
+
     let canceled = false;
 
     const run = async () => {
@@ -221,7 +236,7 @@ const Reader = () => {
     return () => {
       canceled = true;
     };
-  }, [bookId]);
+  }, [authLoading, bookId, user]);
 
   useEffect(() => {
     if (!book) {
@@ -373,6 +388,18 @@ const Reader = () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [canGoNext, canGoPrevious, lastSpreadStart, visiblePageCount]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">
+        <Loader2 className="size-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to={buildSignInPath(`${location.pathname}${location.search}${location.hash}`)} replace />;
+  }
 
   const handleBack = () => {
     if (window.history.length > 1) {

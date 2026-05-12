@@ -49,7 +49,9 @@ export const TopNav = () => {
     return sections;
   }, [isAdmin, user]);
 
-  const profileLabel = profile?.display_name?.trim() || user?.email?.split("@")[0] || "Profile";
+  const metadataDisplayName =
+    typeof user?.user_metadata?.display_name === "string" ? user.user_metadata.display_name.trim() : "";
+  const profileLabel = profile?.display_name?.trim() || metadataDisplayName || user?.email?.split("@")[0] || "Profile";
 
   useEffect(() => {
     let canceled = false;

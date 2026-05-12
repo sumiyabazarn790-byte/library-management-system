@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import type { Book, LoanStatus } from "@/types/library";
 import { useAuth } from "@/contexts/AuthContext";
+import { buildSignInPath } from "@/lib/auth";
 import { getBookCover } from "@/lib/bookCovers";
 import {
   canReadBookNow,
@@ -37,14 +38,15 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
   const hasCanonicalBookId = isUuid(book.id);
   const isActive = loanStatus === "active";
   const isRequested = loanStatus === "requested";
+  const readerPath = getBookReaderPath(book);
 
   const primaryLabel = useMemo(() => {
-    if (canReadFree) return "Read on site";
+    if (canReadFree) return user ? "Read on site" : "Sign in to read";
     if (!hasCanonicalBookId) return "Preview only";
     if (isActive) return "Borrowed";
     if (isRequested) return "Requested";
     return book.available_copies > 0 ? "Borrow" : "Request";
-  }, [book.available_copies, canReadFree, hasCanonicalBookId, isActive, isRequested]);
+  }, [book.available_copies, canReadFree, hasCanonicalBookId, isActive, isRequested, user]);
 
   const completeBorrowFlow = async (borrowMode: "borrow" | "request") => {
     if (!user) {
@@ -117,6 +119,10 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
     await completeBorrowFlow(nextBorrowMode);
   };
 
+  const handleReaderSignIn = () => {
+    navigate(buildSignInPath(readerPath));
+  };
+
   const handleSaveToggle = async () => {
     if (!user) {
       navigate("/auth");
@@ -156,11 +162,12 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
     }
   };
 
-  const cardTrigger = (
+  const renderCardTrigger = (options?: { onClick?: () => void; ariaLabel?: string }) => (
     <button
       type="button"
+      onClick={options?.onClick}
       className="flex flex-1 flex-col text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-      aria-label={canReadFree ? `${book.title} open reader` : `${book.title} open preview`}
+      aria-label={options?.ariaLabel ?? (canReadFree ? `${book.title} open reader` : `${book.title} open preview`)}
     >
       <div className="relative aspect-[3/4] overflow-hidden">
         <img
@@ -213,7 +220,7 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
             </span>
           </div>
           <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/80 sm:text-[11px] sm:tracking-[0.18em]">
-            {canReadFree ? "Read now" : "Preview"}
+            {canReadFree ? (user ? "Read now" : "Sign in") : "Preview"}
           </span>
         </div>
       </div>
@@ -223,12 +230,19 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
   return (
     <article className="group flex flex-col overflow-hidden rounded-[18px] bg-surface-elevated/50 ring-hairline transition-all hover:-translate-y-1 hover:bg-surface-high/50 hover:shadow-cinematic hover:ring-hairline-strong sm:rounded-xl">
       {canReadFree ? (
-        <BookReaderDialog book={book} index={index}>
-          {cardTrigger}
-        </BookReaderDialog>
+        user ? (
+          <BookReaderDialog book={book} index={index}>
+            {renderCardTrigger()}
+          </BookReaderDialog>
+        ) : (
+          renderCardTrigger({
+            onClick: handleReaderSignIn,
+            ariaLabel: `${book.title} sign in to open reader`,
+          })
+        )
       ) : (
         <BookPreviewDialog book={book} index={index} loanStatus={loanStatus}>
-          {cardTrigger}
+          {renderCardTrigger()}
         </BookPreviewDialog>
       )}
 
@@ -271,13 +285,24 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
           )}
 
           {canReadFree ? (
-            <Link
-              to={getBookReaderPath(book)}
-              className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_40px_hsl(var(--primary)/0.5)] sm:h-9 sm:w-auto sm:px-3.5 sm:text-xs"
-            >
-              <BookOpen className="size-3.5" />
-              {primaryLabel}
-            </Link>
+            user ? (
+              <Link
+                to={readerPath}
+                className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_40px_hsl(var(--primary)/0.5)] sm:h-9 sm:w-auto sm:px-3.5 sm:text-xs"
+              >
+                <BookOpen className="size-3.5" />
+                {primaryLabel}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={handleReaderSignIn}
+                className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_40px_hsl(var(--primary)/0.5)] sm:h-9 sm:w-auto sm:px-3.5 sm:text-xs"
+              >
+                <BookOpen className="size-3.5" />
+                {primaryLabel}
+              </button>
+            )
           ) : (
             <button
               type="button"

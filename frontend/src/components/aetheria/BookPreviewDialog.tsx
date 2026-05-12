@@ -11,6 +11,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from "@/contexts/AuthContext";
+import { buildSignInPath } from "@/lib/auth";
 import { getBookCover } from "@/lib/bookCovers";
 import { buildReadingSections, canReadBookNow, getBookReaderPath, isUuid } from "@/lib/library";
 import type { Book, LoanStatus } from "@/types/library";
@@ -35,10 +37,14 @@ export const BookPreviewDialog = ({
   index = 0,
   loanStatus = null,
 }: BookPreviewDialogProps) => {
+  const { user } = useAuth();
   const previewSections = buildReadingSections(book).slice(0, 3);
   const canReadImmediately = canReadBookNow(book);
   const hasCanonicalBookId = isUuid(book.id);
   const statusLabel = getStatusLabel(loanStatus);
+  const readerPath = getBookReaderPath(book);
+  const readerActionPath = user ? readerPath : buildSignInPath(readerPath);
+  const readerActionLabel = user ? "Open text reader" : "Sign in to read";
 
   return (
     <Dialog>
@@ -89,7 +95,13 @@ export const BookPreviewDialog = ({
             <div className="mt-4 flex flex-wrap gap-2 text-xs">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-primary">
                 <BookOpen className="size-3.5" />
-                {canReadImmediately ? "Shuud unshij bolno" : hasCanonicalBookId ? "Zeelej baij unshina" : "Preview-only catalog"}
+                {canReadImmediately
+                  ? user
+                    ? "Shuud unshij bolno"
+                    : "Nevtreed unshina"
+                  : hasCanonicalBookId
+                    ? "Zeelej baij unshina"
+                    : "Preview-only catalog"}
               </span>
               {statusLabel ? (
                 <span className="inline-flex rounded-full bg-secondary-deep/30 px-3 py-1 text-secondary">
@@ -117,10 +129,12 @@ export const BookPreviewDialog = ({
               </p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {canReadImmediately
-                  ? "This title is public-readable, so you can open it instantly from the catalog without borrowing first."
+                  ? user
+                    ? "This title is public-readable, so you can open it from the catalog without borrowing first."
+                    : "This title becomes readable right after you sign in. Borrowing is not required."
                   : !hasCanonicalBookId
                     ? "This title is currently shown as a local preview card only. Borrow and save actions are disabled until it is added to the database catalog."
-                  : book.available_copies > 0
+                    : book.available_copies > 0
                     ? "This title can be borrowed for free from the catalog."
                     : "This title is currently unavailable, so you can place a free request and borrow it once a copy returns."}
               </p>
@@ -128,11 +142,11 @@ export const BookPreviewDialog = ({
               {canReadImmediately ? (
                 <DialogClose asChild>
                   <Link
-                    to={getBookReaderPath(book)}
+                    to={readerActionPath}
                     className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_36px_hsl(var(--primary)/0.45)]"
                   >
                     <BookOpen className="size-3.5" />
-                    Open text reader
+                    {readerActionLabel}
                   </Link>
                 </DialogClose>
               ) : null}

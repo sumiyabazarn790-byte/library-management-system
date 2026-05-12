@@ -1,14 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { BookOpen, Loader2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   DEPLOYED_LOOPBACK_SUPABASE_MESSAGE,
   LOCAL_SUPABASE_UNAVAILABLE_MESSAGE,
 } from "@/integrations/supabase/availability";
-
-const POST_LOGIN_REDIRECT = { pathname: "/app", hash: "#browse" } as const;
+import { resolvePostLoginPath } from "@/lib/auth";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
 const GoogleIcon = () => (
@@ -34,6 +33,7 @@ const GoogleIcon = () => (
 
 const Auth = () => {
   const { signIn, signUp, signInWithGoogle, resendConfirmationEmail, user, loading, authUnavailableMessage } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
   const showLocalSignupHint =
     process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID === "local" &&
@@ -51,14 +51,15 @@ const Auth = () => {
   const showLocalDevHint = authUnavailableMessage === LOCAL_SUPABASE_UNAVAILABLE_MESSAGE;
   const showDeployHint = authUnavailableMessage === DEPLOYED_LOOPBACK_SUPABASE_MESSAGE;
   const shouldRedirectAuthenticatedUser = !loading && Boolean(user);
+  const postLoginRedirectPath = resolvePostLoginPath(new URLSearchParams(location.search).get("next"));
 
   useEffect(() => {
     if (!shouldRedirectAuthenticatedUser) {
       return;
     }
 
-    navigate(POST_LOGIN_REDIRECT, { replace: true });
-  }, [navigate, shouldRedirectAuthenticatedUser]);
+    navigate(postLoginRedirectPath, { replace: true });
+  }, [navigate, postLoginRedirectPath, shouldRedirectAuthenticatedUser]);
 
   if (loading || shouldRedirectAuthenticatedUser) {
     return (
@@ -121,13 +122,13 @@ const Auth = () => {
     setConfirmationEmail("");
     setFormError(null);
     toast.success(mode === "signin" ? "Tavtai moril." : "Burtgel amjilttai.");
-    navigate(POST_LOGIN_REDIRECT, { replace: true });
+    navigate(postLoginRedirectPath, { replace: true });
   };
 
   const handleGoogleSignIn = async () => {
     setFormError(null);
     setGoogleBusy(true);
-    const result = await signInWithGoogle();
+    const result = await signInWithGoogle(postLoginRedirectPath);
     setGoogleBusy(false);
 
     if (result.error) {

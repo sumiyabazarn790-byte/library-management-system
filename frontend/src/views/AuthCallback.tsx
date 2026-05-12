@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { getAuthCallbackError } from "@/lib/auth";
+import { buildSignInPath, getAuthCallbackError, resolvePostLoginPath } from "@/lib/auth";
 
-const POST_LOGIN_REDIRECT = { pathname: "/app", hash: "#browse" } as const;
 const CALLBACK_POLL_INTERVAL_MS = 250;
 const CALLBACK_TIMEOUT_MS = 8000;
 const GENERIC_CALLBACK_ERROR = "Нэвтрэх явцад алдаа гарлаа. Та дахин оролдоно уу.";
@@ -17,10 +16,12 @@ const wait = (delayMs: number) =>
   });
 
 const AuthCallback = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const { user, authUnavailableMessage } = useAuth();
   const [statusMessage, setStatusMessage] = useState("Google нэвтрэлтийг шалгаж байна...");
   const didFinishRef = useRef(false);
+  const postLoginRedirectPath = resolvePostLoginPath(new URLSearchParams(location.search).get("next"));
 
   useEffect(() => {
     if (typeof window === "undefined" || didFinishRef.current) {
@@ -44,7 +45,7 @@ const AuthCallback = () => {
         }
       }
 
-      navigate(target === "app" ? POST_LOGIN_REDIRECT : "/auth", { replace: true });
+      navigate(target === "app" ? postLoginRedirectPath : buildSignInPath(postLoginRedirectPath), { replace: true });
     };
 
     const waitForSession = async () => {
@@ -131,7 +132,7 @@ const AuthCallback = () => {
     return () => {
       active = false;
     };
-  }, [authUnavailableMessage, navigate, user]);
+  }, [authUnavailableMessage, navigate, postLoginRedirectPath, user]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-3">

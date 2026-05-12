@@ -119,11 +119,13 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
   const [savedBooks, setSavedBooks] = useState<SavedBookWithBook[]>([]);
   const [savedLoanStatusByBookId, setSavedLoanStatusByBookId] = useState<Record<string, LoanStatus>>({});
   const [savedLoading, setSavedLoading] = useState(true);
+  const metadataDisplayName =
+    typeof user?.user_metadata?.display_name === "string" ? user.user_metadata.display_name.trim() : "";
 
   useEffect(() => {
-    setDisplayName(profile?.display_name ?? "");
+    setDisplayName(profile?.display_name ?? metadataDisplayName);
     setPreferredGenres((profile?.preferred_genres ?? []).join(", "));
-  }, [profile]);
+  }, [metadataDisplayName, profile]);
 
   useEffect(() => {
     if (!user) {
@@ -206,15 +208,15 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
   }, [refreshKey, user]);
 
   const initials = useMemo(() => {
-    const source = profile?.display_name?.trim() || user?.email?.trim() || "Aetheria";
+    const source = profile?.display_name?.trim() || metadataDisplayName || user?.email?.trim() || "Aetheria";
     const tokens = source.split(/\s+/).filter(Boolean);
     return tokens
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase() ?? "")
       .join("");
-  }, [profile?.display_name, user?.email]);
+  }, [metadataDisplayName, profile?.display_name, user?.email]);
 
-  const profileName = profile?.display_name?.trim() || user?.email?.split("@")[0] || "Aetheria Reader";
+  const profileName = profile?.display_name?.trim() || metadataDisplayName || user?.email?.split("@")[0] || "Aetheria Reader";
   const joinedLabel = profile ? formatLibraryDate(profile.created_at) : "Unknown";
   const genreList = (profile?.preferred_genres ?? []).filter((genre): genre is string => Boolean(genre));
 
@@ -241,18 +243,30 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
 
       const { error } = await supabase
         .from("profiles")
-        .update({
+        .upsert({
+          id: user.id,
           display_name: nextDisplayName,
           preferred_genres: nextGenres,
           updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id);
+        }, { onConflict: "id" });
 
       if (error) {
         throw error;
       }
 
+      const { error: updateUserError } = await supabase.auth.updateUser({
+        data: {
+          display_name: nextDisplayName,
+        },
+      });
+
+      if (updateUserError) {
+        console.warn("profile metadata sync failed", updateUserError);
+      }
+
       await refreshProfile();
+      setDisplayName(nextDisplayName ?? "");
+      setPreferredGenres(nextGenres.join(", "));
       onProfileChange?.();
       toast.success("Profile мэдээлэл хадгалагдлаа.");
     } catch (error) {
@@ -509,7 +523,7 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
               <Button
                 variant="outline"
                 onClick={() => {
-                  setDisplayName(profile?.display_name ?? "");
+                  setDisplayName(profile?.display_name ?? metadataDisplayName);
                   setPreferredGenres((profile?.preferred_genres ?? []).join(", "));
                 }}
                 className="h-11 border-white/15 bg-transparent px-5 text-white hover:bg-white/[0.06]"

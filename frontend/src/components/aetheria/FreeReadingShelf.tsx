@@ -92,7 +92,9 @@ export const FreeReadingShelf = ({
             Free reading shelf
           </h2>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Open these public books instantly without borrowing first.
+            {user
+              ? "Open these public books on site without borrowing first."
+              : "Sign in first to open these public books on site without borrowing."}
           </p>
         </div>
       </div>

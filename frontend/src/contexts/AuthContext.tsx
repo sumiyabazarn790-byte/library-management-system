@@ -8,7 +8,7 @@ import {
   getSupabaseUnavailableReason,
   SUPABASE_AVAILABILITY_CHANGE_EVENT,
 } from "@/integrations/supabase/availability";
-import { buildAuthRedirectUrl } from "@/lib/auth";
+import { buildAuthCallbackPath, buildAuthRedirectUrl } from "@/lib/auth";
 import { mapAuthError, type AuthResult } from "@/lib/authResult";
 import type { Profile } from "@/types/library";
 
@@ -21,7 +21,7 @@ type AuthCtx = {
   authUnavailableMessage: string | null;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signUp: (email: string, password: string, displayName?: string) => Promise<AuthResult>;
-  signInWithGoogle: () => Promise<AuthResult>;
+  signInWithGoogle: (nextPath?: string) => Promise<AuthResult>;
   resendConfirmationEmail: (email: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -246,12 +246,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
-  const signInWithGoogle: AuthCtx["signInWithGoogle"] = async () => {
+  const signInWithGoogle: AuthCtx["signInWithGoogle"] = async (nextPath) => {
     if (authUnavailableMessage) {
       return { error: authUnavailableMessage, reason: "unknown" };
     }
 
-    const redirectUrl = buildAuthRedirectUrl("/auth/callback");
+    const redirectUrl = buildAuthRedirectUrl(buildAuthCallbackPath(nextPath));
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
