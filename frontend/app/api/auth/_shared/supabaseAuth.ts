@@ -68,18 +68,16 @@ export const findUserByEmail = async ({
   let page = 1;
 
   while (true) {
-    const {
-      data: { users },
-      error,
-    } = await adminClient.auth.admin.listUsers({
+    const result = await adminClient.auth.admin.listUsers({
       page,
       perPage: pageSize,
     });
 
-    if (error) {
-      throw error;
+    if (result.error) {
+      throw result.error;
     }
 
+    const users: User[] = result.data.users;
     const match = users.find((user) => user.email?.trim().toLowerCase() === email);
 
     if (match) {
