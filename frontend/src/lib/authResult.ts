@@ -11,6 +11,10 @@ export type AuthResult = {
   reason?: AuthReason | null;
   emailConfirmationRequired?: boolean;
   autoConfirmed?: boolean;
+  session?: {
+    access_token: string;
+    refresh_token: string;
+  } | null;
 };
 
 export const mapAuthError = (message: string | null | undefined): Pick<AuthResult, "error" | "reason"> => {

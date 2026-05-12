@@ -276,6 +276,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return signupResult;
     }
 
+    if (signupResult.session?.access_token && signupResult.session.refresh_token) {
+      const { error: setSessionError } = await supabase.auth.setSession({
+        access_token: signupResult.session.access_token,
+        refresh_token: signupResult.session.refresh_token,
+      });
+
+      if (!setSessionError) {
+        return {
+          error: null,
+          reason: null,
+          emailConfirmationRequired: false,
+        };
+      }
+
+      console.warn("signup session bootstrap skipped", setSessionError.message);
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password,

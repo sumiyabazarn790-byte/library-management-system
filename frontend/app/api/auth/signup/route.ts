@@ -13,6 +13,11 @@ export const runtime = "nodejs";
 const json = (body: AuthResult, status = 200) =>
   NextResponse.json(body, { status });
 
+const SIGN_IN_RETRY_DELAYS_MS = [0, 250, 750, 1500];
+
+const wait = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
@@ -24,7 +29,7 @@ export async function POST(request: Request) {
       return json({ error: "Email and password are required.", reason: "unknown" }, 400);
     }
 
-    const { adminClient } = createSupabaseServerClients();
+    const { authClient, adminClient } = createSupabaseServerClients();
     const { error } = await adminClient.auth.admin.createUser({
       email,
       password,
@@ -38,10 +43,32 @@ export async function POST(request: Request) {
 
     await syncAdminRoleForEmail({ adminClient, email });
 
+    let session: AuthResult["session"] = null;
+
+    for (const delayMs of SIGN_IN_RETRY_DELAYS_MS) {
+      if (delayMs > 0) {
+        await wait(delayMs);
+      }
+
+      const signInResult = await authClient.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (!signInResult.error && signInResult.data.session) {
+        session = {
+          access_token: signInResult.data.session.access_token,
+          refresh_token: signInResult.data.session.refresh_token,
+        };
+        break;
+      }
+    }
+
     return json({
       error: null,
       reason: null,
       emailConfirmationRequired: false,
+      session,
     });
   } catch (error) {
     return json(
