@@ -59,6 +59,22 @@ const postAuthAction = async (path: string, payload: Record<string, unknown>): P
   }
 };
 
+const syncAdminRole = async (email: string | null | undefined) => {
+  const normalizedEmail = email?.trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    return;
+  }
+
+  const result = await postAuthAction("/api/auth/sync-role", {
+    email: normalizedEmail,
+  });
+
+  if (result.error) {
+    console.warn("admin role sync skipped", result.error);
+  }
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -140,6 +156,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(nextSession);
       setUser(verifiedUser);
 
+      await syncAdminRole(verifiedUser.email);
+
+      if (!active) return;
+
       const { data, error } = await supabase.from("profiles").select("*").eq("id", verifiedUser.id).maybeSingle();
 
       if (!active) return;
@@ -185,6 +205,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProfile(null);
       return;
     }
+
+    await syncAdminRole(user.email);
 
     const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
 

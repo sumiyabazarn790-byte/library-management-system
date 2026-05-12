@@ -42,6 +42,7 @@ Notes:
 - Frontend env values live in `frontend/.env.local`.
 - For Vercel deployments, also set `NEXT_PUBLIC_SUPABASE_URL` and a public Supabase key in Project Settings -> Environment Variables.
 - Preferred key name is `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; `NEXT_PUBLIC_SUPABASE_ANON_KEY` is still accepted as a legacy fallback.
+- To auto-grant admin access to selected accounts, set `ADMIN_EMAILS=email1@example.com,email2@example.com` in the frontend server environment.
 - Google login deploy hiisnii daraa `redirect_uri_mismatch` garch baival 2 gazar zaaval shinechilne:
   `Supabase Dashboard -> Authentication -> URL Configuration` deer `Site URL`-aa deploy domain-r ni tavij, redirect URL-d `https://<your-domain>/auth/callback` nemne.
   `Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client` deer `Authorized redirect URI`-d `https://<your-project-ref>.supabase.co/auth/v1/callback` nemne.

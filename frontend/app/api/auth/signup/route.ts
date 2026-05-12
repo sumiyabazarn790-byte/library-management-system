@@ -5,6 +5,7 @@ import {
   normalizeDisplayName,
   normalizeEmail,
   normalizePassword,
+  syncAdminRoleForEmail,
 } from "../_shared/supabaseAuth";
 
 export const runtime = "nodejs";
@@ -34,6 +35,8 @@ export async function POST(request: Request) {
     if (error) {
       return json(mapAuthError(error.message));
     }
+
+    await syncAdminRoleForEmail({ adminClient, email });
 
     return json({
       error: null,

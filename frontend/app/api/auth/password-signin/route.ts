@@ -5,6 +5,7 @@ import {
   findUserByEmail,
   normalizeEmail,
   normalizePassword,
+  syncAdminRoleForEmail,
 } from "../_shared/supabaseAuth";
 
 export const runtime = "nodejs";
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
     const firstAttempt = await authClient.auth.signInWithPassword({ email, password });
 
     if (!firstAttempt.error) {
+      await syncAdminRoleForEmail({ adminClient, email });
       return json({ error: null, reason: null });
     }
 
@@ -54,6 +56,8 @@ export async function POST(request: Request) {
     if (secondAttempt.error) {
       return json(mapAuthError(secondAttempt.error.message));
     }
+
+    await syncAdminRoleForEmail({ adminClient, email });
 
     return json({
       error: null,

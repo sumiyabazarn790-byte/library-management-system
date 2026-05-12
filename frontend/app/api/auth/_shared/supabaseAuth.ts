@@ -56,6 +56,24 @@ export const normalizePassword = (value: unknown) =>
 export const normalizeDisplayName = (value: unknown) =>
   typeof value === "string" ? value.trim() : "";
 
+const getAdminEmailAllowlist = () =>
+  new Set(
+    getEnv("ADMIN_EMAILS")
+      .split(/[,\n;]+/)
+      .map((value) => normalizeEmail(value))
+      .filter(Boolean),
+  );
+
+export const isAdminBootstrapEmail = (email: string) => {
+  const normalizedEmail = normalizeEmail(email);
+
+  if (!normalizedEmail) {
+    return false;
+  }
+
+  return getAdminEmailAllowlist().has(normalizedEmail);
+};
+
 export const findUserByEmail = async ({
   adminClient,
   email,
@@ -90,4 +108,36 @@ export const findUserByEmail = async ({
 
     page += 1;
   }
+};
+
+export const syncAdminRoleForEmail = async ({
+  adminClient,
+  email,
+}: {
+  adminClient: ReturnType<typeof createServerAuthClient>;
+  email: string;
+}) => {
+  const normalizedEmail = normalizeEmail(email);
+
+  if (!isAdminBootstrapEmail(normalizedEmail)) {
+    return false;
+  }
+
+  const user = await findUserByEmail({ adminClient, email: normalizedEmail });
+
+  if (!user) {
+    return false;
+  }
+
+  const { error } = await adminClient
+    .from("profiles")
+    .update({ role: "admin" })
+    .eq("id", user.id)
+    .neq("role", "admin");
+
+  if (error) {
+    throw error;
+  }
+
+  return true;
 };
