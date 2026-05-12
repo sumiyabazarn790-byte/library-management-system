@@ -230,7 +230,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     if (authGateResult.error) {
-      return authGateResult;
+      if (authGateResult.reason && authGateResult.reason !== "unknown") {
+        return authGateResult;
+      }
+
+      console.warn("password-signin gate skipped", authGateResult.error);
     }
 
     const { error } = await supabase.auth.signInWithPassword({

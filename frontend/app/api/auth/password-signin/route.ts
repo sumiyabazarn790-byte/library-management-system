@@ -23,33 +23,29 @@ export async function POST(request: Request) {
       return json({ error: "Email and password are required.", reason: "unknown" }, 400);
     }
 
-    const { adminClient } = createSupabaseServerClients();
-    const user = await findUserByEmail({ adminClient, email });
     let autoConfirmed = false;
+    try {
+      const { adminClient } = createSupabaseServerClients();
+      const user = await findUserByEmail({ adminClient, email });
 
-    if (!user) {
-      return json({ error: null, reason: null });
-    }
+      if (user) {
+        if (!user.email_confirmed_at) {
+          const { error: updateError } = await adminClient.auth.admin.updateUserById(user.id, {
+            email_confirm: true,
+          });
 
-    if (!user.email_confirmed_at) {
-      const { error: updateError } = await adminClient.auth.admin.updateUserById(user.id, {
-        email_confirm: true,
-      });
+          if (updateError) {
+            throw updateError;
+          }
 
-      if (updateError) {
-        return json(
-          {
-            error: updateError.message,
-            reason: "unknown",
-          },
-          500,
-        );
+          autoConfirmed = true;
+        }
+
+        await syncAdminRoleForEmail({ adminClient, email });
       }
-
-      autoConfirmed = true;
+    } catch (error) {
+      console.warn("password-signin preflight skipped", error);
     }
-
-    await syncAdminRoleForEmail({ adminClient, email });
 
     return json({
       error: null,
@@ -57,9 +53,11 @@ export async function POST(request: Request) {
       autoConfirmed,
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Sign in failed.";
+    console.error("password-signin route failed", error);
     return json(
       {
-        error: error instanceof Error ? error.message : "Sign in failed.",
+        error: message,
         reason: "unknown",
       },
       500,
