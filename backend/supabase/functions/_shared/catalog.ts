@@ -16,11 +16,20 @@ export type CatalogBook = {
   reading_content?: string[] | null;
 };
 
+type CatalogAiConfig = {
+  openAiApiKey?: string | null;
+  openAiBaseUrl?: string | null;
+  openAiQueryModel?: string | null;
+  lovableApiKey?: string | null;
+};
+
 const QUERY_EXPANSION_PROMPT =
   "You translate book search queries (Mongolian Cyrillic or English) into a JSON array of 3-6 short search terms. Include likely title fragments, author names, genres, themes, and bilingual synonyms when helpful. Output JSON only.";
 
 const MIN_QUERY_TERM_LENGTH = 2;
 const DEFAULT_CATALOG_SCAN_LIMIT = 250;
+const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_OPENAI_QUERY_MODEL = "gpt-4.1-mini";
 
 const normalizeSearchText = (value: string) =>
   value
@@ -67,6 +76,23 @@ const dedupeBooks = (books: CatalogBook[]) => {
   }
 
   return unique;
+};
+
+const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, "");
+
+const parseJsonObject = (value: string) => {
+  const trimmed = value.trim();
+  const rawJson = trimmed.startsWith("{") ? trimmed : trimmed.match(/\{[\s\S]*\}/)?.[0];
+
+  if (!rawJson) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawJson) as { terms?: unknown };
+  } catch {
+    return null;
+  }
 };
 
 const scoreField = (fieldValue: string, term: string, exactWeight: number, containsWeight: number) => {
@@ -124,14 +150,59 @@ const scoreCatalogBook = (book: CatalogBook, query: string, expandedTerms: strin
   return score;
 };
 
-export const expandCatalogQuery = async (query: string, lovableApiKey?: string | null): Promise<string[]> => {
+export const expandCatalogQuery = async (
+  query: string,
+  {
+    openAiApiKey,
+    openAiBaseUrl,
+    openAiQueryModel,
+    lovableApiKey,
+  }: CatalogAiConfig = {},
+): Promise<string[]> => {
   const normalizedQuery = query.trim();
 
-  if (!normalizedQuery || !lovableApiKey) {
+  if (!normalizedQuery || (!openAiApiKey && !lovableApiKey)) {
     return [];
   }
 
   try {
+    if (openAiApiKey) {
+      const response = await fetch(`${normalizeBaseUrl(openAiBaseUrl || DEFAULT_OPENAI_BASE_URL)}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${openAiApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: openAiQueryModel || DEFAULT_OPENAI_QUERY_MODEL,
+          messages: [
+            {
+              role: "system",
+              content: `${QUERY_EXPANSION_PROMPT} Return {"terms":["..."]}.`,
+            },
+            { role: "user", content: normalizedQuery },
+          ],
+          temperature: 0.2,
+          max_tokens: 160,
+          response_format: {
+            type: "json_object",
+          },
+        }),
+      });
+
+      if (response.ok) {
+        const json = await response.json();
+        const content = json.choices?.[0]?.message?.content;
+        const parsed = typeof content === "string" ? parseJsonObject(content) : null;
+        const terms = Array.isArray(parsed?.terms) ? parsed.terms.filter((value) => typeof value === "string") : [];
+        return uniqueTerms(terms).slice(0, 6);
+      }
+    }
+
+    if (!lovableApiKey) {
+      return [];
+    }
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -193,12 +264,18 @@ export const expandCatalogQuery = async (query: string, lovableApiKey?: string |
 export const searchCatalogBooks = async ({
   supabase,
   query,
+  openAiApiKey,
+  openAiBaseUrl,
+  openAiQueryModel,
   lovableApiKey,
   limit = 16,
   catalogScanLimit = DEFAULT_CATALOG_SCAN_LIMIT,
 }: {
   supabase: SupabaseClient;
   query: string;
+  openAiApiKey?: string | null;
+  openAiBaseUrl?: string | null;
+  openAiQueryModel?: string | null;
   lovableApiKey?: string | null;
   limit?: number;
   catalogScanLimit?: number;
@@ -230,7 +307,12 @@ export const searchCatalogBooks = async ({
     throw fuzzyError;
   }
 
-  const expandedTerms = await expandCatalogQuery(normalizedQuery, lovableApiKey);
+  const expandedTerms = await expandCatalogQuery(normalizedQuery, {
+    openAiApiKey,
+    openAiBaseUrl,
+    openAiQueryModel,
+    lovableApiKey,
+  });
   const queryTerms = uniqueTerms([
     normalizedQuery,
     ...expandedTerms,

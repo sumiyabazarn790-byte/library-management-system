@@ -36,3 +36,17 @@ Copy-Item backend/.env.example backend/.env
 # backend/.env dotor OPENAI_API_KEY=sk-... gej bichne
 python backend/scripts/openai_hello.py "Hello"
 ```
+
+For the Aetheria chat/search edge functions, you can load the same secrets with:
+
+```powershell
+supabase secrets set --env-file backend/.env --workdir backend
+```
+
+Useful optional values in `backend/.env`:
+
+```powershell
+OPENAI_CHAT_MODEL=gpt-4.1-mini
+OPENAI_QUERY_MODEL=gpt-4.1-mini
+OPENAI_BASE_URL=
+```

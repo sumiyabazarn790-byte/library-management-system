@@ -38,6 +38,7 @@ type LoanRow = {
 };
 
 type ProfileRow = {
+  display_name?: string | null;
   preferred_genres: string[] | null;
 };
 
@@ -54,7 +55,18 @@ You help readers:
 - get personalized recommendations based on preferred genres
 - answer general knowledge and literary questions
 
-When you use catalog context, never invent books that are not provided in context. Be warm, concise, and helpful.`;
+Rules:
+- When using library or catalog context, never invent books, availability, due dates, or reader history that are not explicitly provided.
+- If the user asks a general knowledge question, you may answer it, but do not pretend it came from the archive.
+- Prefer short, clear answers. Use bullets when listing books or options.
+- When recommending books from the catalog, favor titles that are available now and explain why they match in one sentence when helpful.
+- If the user's request is ambiguous, make the best reasonable assumption and say what you assumed.
+
+Be warm, grounded, concise, and genuinely helpful.`;
+
+const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_OPENAI_CHAT_MODEL = "gpt-4.1-mini";
+const DEFAULT_OPENAI_QUERY_MODEL = "gpt-4.1-mini";
 
 const STALE_AUTH_SESSION_PATTERN =
   /user from sub claim in jwt does not exist|session from session_id claim in jwt does not exist|invalid refresh token|refresh token not found|loans_user_id_fkey|violates foreign key constraint ["']loans_user_id_fkey["']/i;
@@ -154,6 +166,8 @@ const getEnv = (name: string) => {
   const value = Deno.env.get(name)?.trim();
   return value ? value : null;
 };
+
+const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, "");
 
 const canonicalizeIntentWord = (word: string) => {
   const collapsed = word.replace(/([a-z])\1{2,}/g, "$1$1");
@@ -649,12 +663,93 @@ const fetchRecommendationGenres = async ({
   return genreSet;
 };
 
+const fetchChatProfile = async ({
+  userClient,
+  user,
+}: {
+  userClient: SupabaseClient | null;
+  user: User | null;
+}) => {
+  if (!userClient || !user) {
+    return null;
+  }
+
+  const { data, error } = await userClient
+    .from("profiles")
+    .select("display_name, preferred_genres")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("chat profile context load failed", error);
+    return null;
+  }
+
+  return (data ?? null) as ProfileRow | null;
+};
+
+const buildUserContextMessage = ({
+  profile,
+  loans,
+}: {
+  profile: ProfileRow | null;
+  loans: LoanRow[];
+}) => {
+  if (!profile && !loans.length) {
+    return "";
+  }
+
+  const lines = ["Authenticated reader context:"];
+
+  if (profile?.display_name?.trim()) {
+    lines.push(`- Reader display name: ${profile.display_name.trim()}`);
+  }
+
+  const preferredGenres = (profile?.preferred_genres ?? [])
+    .map((genre) => genre?.trim())
+    .filter((genre): genre is string => Boolean(genre));
+
+  if (preferredGenres.length) {
+    lines.push(`- Preferred genres: ${preferredGenres.slice(0, 6).join(", ")}`);
+  }
+
+  if (loans.length) {
+    lines.push("- Current loans:");
+    lines.push(
+      ...loans.slice(0, 6).map((loan) => {
+        const duePart = loan.status === "active" ? `, due ${new Date(loan.due_date).toLocaleDateString("en-US")}` : "";
+        return `  * ${loan.book.title} — ${loan.book.author} (${loan.status}${duePart})`;
+      }),
+    );
+  }
+
+  return lines.join("\n");
+};
+
+const buildCatalogContextMessage = (books: CatalogBook[]) => {
+  if (!books.length) {
+    return "";
+  }
+
+  return "Relevant catalog context:\n" +
+    books
+      .slice(0, 8)
+      .map((book, index) => {
+        const readerState = hasReadableContent(book) ? "readable on site" : "borrow/request only";
+        return `${index + 1}. "${book.title}" — ${book.author} [${book.genre}, ${book.language}] (${book.available_copies}/${book.total_copies} available, ${readerState})\n   ${book.description}`;
+      })
+      .join("\n");
+};
+
 const buildRecommendationReply = async ({
   serviceClient,
   userClient,
   user,
   language,
   query,
+  openAiApiKey,
+  openAiBaseUrl,
+  openAiQueryModel,
   lovableApiKey,
 }: {
   serviceClient: SupabaseClient;
@@ -662,12 +757,18 @@ const buildRecommendationReply = async ({
   user: User | null;
   language: AssistantLanguage;
   query: string;
+  openAiApiKey?: string | null;
+  openAiBaseUrl?: string | null;
+  openAiQueryModel?: string | null;
   lovableApiKey?: string | null;
 }) => {
   if (query) {
     const books = await searchCatalogBooks({
       supabase: serviceClient,
       query,
+      openAiApiKey,
+      openAiBaseUrl,
+      openAiQueryModel,
       lovableApiKey,
       limit: 4,
     });
@@ -732,6 +833,9 @@ const buildHandledReply = async ({
   serviceClient,
   userClient,
   user,
+  openAiApiKey,
+  openAiBaseUrl,
+  openAiQueryModel,
   lovableApiKey,
 }: {
   intent: AssistantIntent;
@@ -739,6 +843,9 @@ const buildHandledReply = async ({
   serviceClient: SupabaseClient;
   userClient: SupabaseClient | null;
   user: User | null;
+  openAiApiKey?: string | null;
+  openAiBaseUrl?: string | null;
+  openAiQueryModel?: string | null;
   lovableApiKey?: string | null;
 }) => {
   switch (intent.kind) {
@@ -748,6 +855,9 @@ const buildHandledReply = async ({
       const books = await searchCatalogBooks({
         supabase: serviceClient,
         query: intent.query,
+        openAiApiKey,
+        openAiBaseUrl,
+        openAiQueryModel,
         lovableApiKey,
         limit: 4,
       });
@@ -773,6 +883,9 @@ const buildHandledReply = async ({
         user,
         language,
         query: intent.query,
+        openAiApiKey,
+        openAiBaseUrl,
+        openAiQueryModel,
         lovableApiKey,
       });
     case "borrow":
@@ -790,6 +903,9 @@ const buildHandledReply = async ({
       const books = await searchCatalogBooks({
         supabase: serviceClient,
         query: intent.query,
+        openAiApiKey,
+        openAiBaseUrl,
+        openAiQueryModel,
         lovableApiKey,
         limit: 5,
       });
@@ -891,6 +1007,10 @@ Deno.serve(async (req) => {
 
   try {
     const lovableApiKey = getEnv("LOVABLE_API_KEY");
+    const openAiApiKey = getEnv("OPENAI_API_KEY");
+    const openAiBaseUrl = getEnv("OPENAI_BASE_URL") ?? DEFAULT_OPENAI_BASE_URL;
+    const openAiChatModel = getEnv("OPENAI_CHAT_MODEL") ?? DEFAULT_OPENAI_CHAT_MODEL;
+    const openAiQueryModel = getEnv("OPENAI_QUERY_MODEL") ?? getEnv("OPENAI_CHAT_MODEL") ?? DEFAULT_OPENAI_QUERY_MODEL;
     const { serviceClient, userClient } = getSupabaseClients(req);
     const user = await getAuthenticatedUser(userClient);
     const { messages } = await req.json() as { messages: ChatMessage[] };
@@ -906,6 +1026,9 @@ Deno.serve(async (req) => {
           serviceClient,
           userClient,
           user,
+          openAiApiKey,
+          openAiBaseUrl,
+          openAiQueryModel,
           lovableApiKey,
         });
 
@@ -918,52 +1041,81 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!lovableApiKey) {
+    if (!openAiApiKey && !lovableApiKey) {
       return jsonResponse({ reply: buildBackendUnavailableReply(language) });
     }
 
-    let context = "";
+    let catalogContext = "";
+    let userContext = "";
 
     try {
       const books = await searchCatalogBooks({
         supabase: serviceClient,
         query: lastUser,
+        openAiApiKey,
+        openAiBaseUrl,
+        openAiQueryModel,
         lovableApiKey,
         limit: 8,
       });
 
-      if (books.length) {
-        context = "Available books in the Aetheria catalog:\n" +
-          books
-            .slice(0, 10)
-            .map(
-              (book, index) =>
-                `${index + 1}. "${book.title}" - ${book.author} [${book.genre}, ${book.language}] - ${book.description} (${book.available_copies}/${book.total_copies} available)`,
-            )
-            .join("\n");
-      }
+      catalogContext = buildCatalogContextMessage(books);
     } catch (error) {
       console.warn("context build failed", error);
     }
 
-    const systemMessages: ChatMessage[] = [{ role: "system", content: SYSTEM_PROMPT }];
-
-    if (context) {
-      systemMessages.push({ role: "system", content: context });
+    try {
+      const profile = await fetchChatProfile({ userClient, user });
+      const loans =
+        userClient && user
+          ? await fetchLoans({
+              userClient,
+              userId: user.id,
+              statuses: ["active", "requested"],
+              limit: 6,
+            })
+          : [];
+      userContext = buildUserContextMessage({ profile, loans });
+    } catch (error) {
+      console.warn("user context build failed", error);
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [...systemMessages, ...messages],
-        stream: true,
-      }),
-    });
+    const systemMessages: ChatMessage[] = [{ role: "system", content: SYSTEM_PROMPT }];
+
+    if (userContext) {
+      systemMessages.push({ role: "system", content: userContext });
+    }
+
+    if (catalogContext) {
+      systemMessages.push({ role: "system", content: catalogContext });
+    }
+
+    const response = openAiApiKey
+      ? await fetch(`${normalizeBaseUrl(openAiBaseUrl)}/chat/completions`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openAiApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: openAiChatModel,
+            messages: [...systemMessages, ...messages],
+            temperature: 0.55,
+            stream: true,
+          }),
+        })
+      : await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${lovableApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [...systemMessages, ...messages],
+            stream: true,
+          }),
+        });
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -978,7 +1130,7 @@ Deno.serve(async (req) => {
       }
 
       const text = await response.text();
-      console.error("AI gateway error:", response.status, text);
+      console.error(openAiApiKey ? "OpenAI error:" : "AI gateway error:", response.status, text);
 
       return jsonResponse({ error: "The AI service returned an error." }, { status: 500 });
     }
