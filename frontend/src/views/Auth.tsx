@@ -187,12 +187,8 @@ const Auth = () => {
         </button>
 
         <p className="mt-2 text-center text-xs leading-relaxed text-muted-foreground">
-          Password login deer browser console-d <code>400</code> esvel <code>401</code> haragdval ihevchlen buruu nuuts
-          ug esvel burtgelgui account baih tohioldol baina.
-        </p>
-        <p className="mt-1 text-center text-xs leading-relaxed text-muted-foreground">
-          Shine account-uud email verification shaardahgui. Signup deer <code>422</code> haragdval ihevchlen ene
-          email-eer account al hediiin uusssen baidag.
+          Shine account-uud email verification shaardahgui. Login esvel signup aldaa garval tailbar ni doorh form deer
+          shuud haragdana.
         </p>
 
         {showLocalSignupHint && !authDisabled && (

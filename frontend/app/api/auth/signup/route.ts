@@ -10,7 +10,7 @@ import {
 
 export const runtime = "nodejs";
 
-const json = (body: AuthResult, status = body.error ? 400 : 200) =>
+const json = (body: AuthResult, status = 200) =>
   NextResponse.json(body, { status });
 
 export async function POST(request: Request) {

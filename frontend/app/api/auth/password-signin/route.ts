@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mapAuthError, type AuthResult } from "@/lib/authResult";
+import type { AuthResult } from "@/lib/authResult";
 import {
   createSupabaseServerClients,
   findUserByEmail,
@@ -10,7 +10,7 @@ import {
 
 export const runtime = "nodejs";
 
-const json = (body: AuthResult, status = body.error ? 400 : 200) =>
+const json = (body: AuthResult, status = 200) =>
   NextResponse.json(body, { status });
 
 export async function POST(request: Request) {
@@ -23,38 +23,30 @@ export async function POST(request: Request) {
       return json({ error: "Email and password are required.", reason: "unknown" }, 400);
     }
 
-    const { authClient, adminClient } = createSupabaseServerClients();
-    const firstAttempt = await authClient.auth.signInWithPassword({ email, password });
+    const { adminClient } = createSupabaseServerClients();
+    const user = await findUserByEmail({ adminClient, email });
+    let autoConfirmed = false;
 
-    if (!firstAttempt.error) {
-      await syncAdminRoleForEmail({ adminClient, email });
+    if (!user) {
       return json({ error: null, reason: null });
     }
 
-    const initialResult = mapAuthError(firstAttempt.error.message);
+    if (!user.email_confirmed_at) {
+      const { error: updateError } = await adminClient.auth.admin.updateUserById(user.id, {
+        email_confirm: true,
+      });
 
-    if (initialResult.reason !== "email_not_confirmed") {
-      return json(initialResult);
-    }
+      if (updateError) {
+        return json(
+          {
+            error: updateError.message,
+            reason: "unknown",
+          },
+          500,
+        );
+      }
 
-    const user = await findUserByEmail({ adminClient, email });
-
-    if (!user) {
-      return json(initialResult);
-    }
-
-    const { error: updateError } = await adminClient.auth.admin.updateUserById(user.id, {
-      email_confirm: true,
-    });
-
-    if (updateError) {
-      return json(mapAuthError(updateError.message), 500);
-    }
-
-    const secondAttempt = await authClient.auth.signInWithPassword({ email, password });
-
-    if (secondAttempt.error) {
-      return json(mapAuthError(secondAttempt.error.message));
+      autoConfirmed = true;
     }
 
     await syncAdminRoleForEmail({ adminClient, email });
@@ -62,7 +54,7 @@ export async function POST(request: Request) {
     return json({
       error: null,
       reason: null,
-      autoConfirmed: true,
+      autoConfirmed,
     });
   } catch (error) {
     return json(

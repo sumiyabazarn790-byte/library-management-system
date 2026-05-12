@@ -140,11 +140,20 @@ export const primeSupabaseAvailability = async () => {
 
   try {
     const healthUrl = new URL("/auth/v1/health", SUPABASE_URL).toString();
-    await fetch(healthUrl, {
+    const response = await fetch(healthUrl, {
       method: "GET",
       cache: "no-store",
+      headers: {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+      },
       signal: controller.signal,
     });
+
+    if (!response.ok) {
+      throw new Error(`Supabase auth health check failed with status ${response.status}`);
+    }
+
     clearSupabaseUnavailableMarker();
     return { available: true as const, reason: null };
   } catch {
