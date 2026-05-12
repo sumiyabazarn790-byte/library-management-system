@@ -31,9 +31,16 @@ describe("assistant intent detection", () => {
   });
 
   it("extracts recommendation topics from Mongolian commands", () => {
-    expect(assistant.detectAssistantIntent("санал болго science fiction")).toEqual({
+    expect(assistant.detectAssistantIntent("sanal bolgo science fiction")).toEqual({
       kind: "recommend",
       query: "science fiction",
+    });
+  });
+
+  it("detects readable-book prompts", () => {
+    expect(assistant.detectAssistantIntent("show books I can read now")).toEqual({
+      kind: "readable",
+      query: "",
     });
   });
 
@@ -84,7 +91,7 @@ describe("assistant follow-up actions", () => {
             role: "assistant",
             content: [
               "I found these catalog matches for \"the alchemist's codex\":",
-              "• The Alchemist's Codex — Iris Vale (Rare Archives, 3/3 available)",
+              "\u2022 The Alchemist's Codex \u2014 Iris Vale (Rare Archives, 3/3 available)",
               "If you want one, say \"borrow <title>\" or \"request <title>\".",
             ].join("\n"),
           },
@@ -108,8 +115,8 @@ describe("assistant follow-up actions", () => {
             role: "assistant",
             content: [
               "I found these catalog matches for \"alchemy\":",
-              "• The Alchemist's Codex — Iris Vale (Rare Archives, 3/3 available)",
-              "• The Glass Laboratory — Mara Ellin (Science, 2/2 available)",
+              "\u2022 The Alchemist's Codex \u2014 Iris Vale (Rare Archives, 3/3 available)",
+              "\u2022 The Glass Laboratory \u2014 Mara Ellin (Science, 2/2 available)",
             ].join("\n"),
           },
           { role: "user", content: "borrow" },
@@ -118,6 +125,30 @@ describe("assistant follow-up actions", () => {
     ).toEqual({
       query: "",
       options: ["The Alchemist's Codex", "The Glass Laboratory"],
+    });
+  });
+
+  it("resolves ordinal follow-ups against the previous catalog list", () => {
+    expect(
+      assistant.inferFollowUpTargetFromHistory({
+        text: "borrow the second one",
+        intentKind: "borrow",
+        history: [
+          { role: "user", content: "alchemy" },
+          {
+            role: "assistant",
+            content: [
+              'I found these catalog matches for "alchemy":',
+              "\u2022 The Alchemist's Codex \u2014 Iris Vale (Rare Archives, 3/3 available)",
+              "\u2022 The Glass Laboratory \u2014 Mara Ellin (Science, 2/2 available)",
+              "\u2022 Midnight Atlas \u2014 Nia Sol (Fantasy, 1/1 available)",
+            ].join("\n"),
+          },
+        ],
+      }),
+    ).toEqual({
+      query: "The Glass Laboratory",
+      options: [],
     });
   });
 });

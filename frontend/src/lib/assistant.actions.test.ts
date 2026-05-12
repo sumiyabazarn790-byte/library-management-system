@@ -4,6 +4,7 @@ import type { Book, LoanWithBook, Profile } from "@/types/library";
 const libraryMocks = vi.hoisted(() => ({
   canReadBookNow: vi.fn(() => false),
   fetchLoans: vi.fn(),
+  fetchPublicReadableBooks: vi.fn(),
   fetchRecommendedBooks: vi.fn(),
   formatLibraryDate: vi.fn(() => "2026-05-11"),
   resolveBookId: vi.fn(),
@@ -22,6 +23,7 @@ const supabaseMocks = vi.hoisted(() => ({
 vi.mock("@/lib/library", () => ({
   canReadBookNow: libraryMocks.canReadBookNow,
   fetchLoans: libraryMocks.fetchLoans,
+  fetchPublicReadableBooks: libraryMocks.fetchPublicReadableBooks,
   fetchRecommendedBooks: libraryMocks.fetchRecommendedBooks,
   formatLibraryDate: libraryMocks.formatLibraryDate,
   resolveBookId: libraryMocks.resolveBookId,
@@ -92,6 +94,8 @@ describe("assistant action handling", () => {
     libraryMocks.canReadBookNow.mockReset();
     libraryMocks.canReadBookNow.mockReturnValue(false);
     libraryMocks.fetchLoans.mockReset();
+    libraryMocks.fetchPublicReadableBooks.mockReset();
+    libraryMocks.fetchPublicReadableBooks.mockResolvedValue([]);
     libraryMocks.fetchRecommendedBooks.mockReset();
     libraryMocks.formatLibraryDate.mockReset();
     libraryMocks.formatLibraryDate.mockReturnValue("2026-05-11");
@@ -125,6 +129,28 @@ describe("assistant action handling", () => {
     expect(reply.handled).toBe(true);
     expect(reply.reply).toContain("Atomic Habits");
     expect(libraryMocks.searchBooks).toHaveBeenCalledWith("habit change", 4);
+  });
+
+  it("lists books that can be read right away", async () => {
+    libraryMocks.fetchPublicReadableBooks.mockResolvedValue([
+      baseBook({
+        id: "book-read-1",
+        title: "Sherlock Holmes",
+        author: "Arthur Conan Doyle",
+        available_copies: 1,
+        is_public_readable: true,
+        reading_content: ["A long readable opening section that is definitely long enough to count as reader content."],
+      }),
+    ]);
+
+    const reply = await assistant.resolveLocalAssistantReply({
+      text: "show books I can read now",
+      history: [],
+    });
+
+    expect(reply.handled).toBe(true);
+    expect(reply.reply).toContain("Sherlock Holmes");
+    expect(libraryMocks.fetchPublicReadableBooks).toHaveBeenCalledWith(6);
   });
 
   it("shows the user's current loans", async () => {
@@ -183,6 +209,45 @@ describe("assistant action handling", () => {
     expect(reply.handled).toBe(true);
     expect(supabaseMocks.rpc).toHaveBeenCalledWith("borrow_book", { p_book_id: "book-1" });
     expect(reply.reply).toContain("Atomic Habits");
+  });
+
+  it("borrows a referenced follow-up option from the previous assistant list", async () => {
+    const firstBook = baseBook({
+      id: "book-10",
+      title: "Atomic Habits",
+      author: "James Clear",
+    });
+    const secondBook = baseBook({
+      id: "book-11",
+      title: "Project Hail Mary",
+      author: "Andy Weir",
+      genre: "Science Fiction",
+    });
+
+    libraryMocks.searchBooks.mockResolvedValue([secondBook]);
+    libraryMocks.resolveBookId.mockResolvedValue("book-11");
+
+    const reply = await assistant.resolveLocalAssistantReply({
+      text: "borrow the second one",
+      userId: "user-1",
+      history: [
+        { role: "user", content: "science fiction" },
+        {
+          role: "assistant",
+          content: [
+            'I found these catalog matches for "science fiction":',
+            `\u2022 ${firstBook.title} \u2014 ${firstBook.author} (${firstBook.genre}, ${firstBook.available_copies}/${firstBook.total_copies} available)`,
+            `\u2022 ${secondBook.title} \u2014 ${secondBook.author} (${secondBook.genre}, ${secondBook.available_copies}/${secondBook.total_copies} available)`,
+            'If you want one, say "borrow <title>" or "request <title>".',
+          ].join("\n"),
+        },
+      ],
+    });
+
+    expect(reply.handled).toBe(true);
+    expect(libraryMocks.searchBooks).toHaveBeenCalledWith("Project Hail Mary", 5);
+    expect(supabaseMocks.rpc).toHaveBeenCalledWith("borrow_book", { p_book_id: "book-11" });
+    expect(reply.reply).toContain("Project Hail Mary");
   });
 
   it("requests unavailable books through RPC", async () => {

@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   canReadBookNow,
   fetchLoans,
+  fetchPublicReadableBooks,
   fetchRecommendedBooks,
   formatLibraryDate,
   resolveBookId,
@@ -16,6 +17,7 @@ type AssistantLanguage = "mn" | "en";
 export type AssistantIntentKind =
   | "capabilities"
   | "loans"
+  | "readable"
   | "recommend"
   | "borrow"
   | "request"
@@ -99,7 +101,7 @@ const ACTION_CAPTURE_PATTERNS = {
     /hai(?:h)?\s+(.+)/i,
     /ol(?:oh)?\s+(.+)/i,
   ],
-} satisfies Record<Exclude<AssistantIntentKind, "capabilities" | "loans" | "unknown">, RegExp[]>;
+} satisfies Record<Exclude<AssistantIntentKind, "capabilities" | "loans" | "readable" | "unknown">, RegExp[]>;
 
 const isMongolian = (text: string) => /[\u0400-\u04FF]/.test(text);
 
@@ -260,6 +262,11 @@ const hasLoanOverviewHint = (text: string) => {
 const isRecommendationQuestion = (text: string) =>
   /(recommend|suggest|санал\s+болго|sanal\s+bolgo|what should i read|ямар ном унш)/i.test(text);
 
+const isReadableBooksQuestion = (text: string) =>
+  /(?:read(?:able)?\s+(?:books?|titles?)|books?\s+(?:i can read|to read now)|can i read|can i open|read on site|public reader|reader books|unshij boloh|shuud unshih|site deer unshih)/i.test(
+    text,
+  );
+
 const hasSearchSignal = (text: string) =>
   /(search|find|look for|book by|book about|author|title|genre|catalog|library|ном|зохиолч|гарчиг|genre|hai|ol)/i.test(
     text,
@@ -293,6 +300,63 @@ const extractCatalogTitlesFromAssistantMessage = (content: string) =>
     .map((line) => line.match(/^•\s+(.+?)\s+[—-]\s+.+\(.+\)$/)?.[1]?.trim() ?? "")
     .filter(Boolean);
 
+const GENERIC_REFERENCE_QUERY_PATTERN =
+  /^(?:it|this one|that one|this book|that book|ehnii(?:h)?|suuliin|ene nom|ter nom|\u044d\u043d\u044d|\u0442\u044d\u0440|\u044d\u0445\u043d\u0438\u0439|\u0441\u04af\u04af\u043b\u0438\u0439\u043d)$/i;
+
+const FIRST_REFERENCE_QUERY_PATTERN =
+  /^(?:(?:the\s+)?(?:first|1st)(?:\s+(?:one|book|title))?|ehnii(?:h)?(?:\s+nom)?|neg(?:\s|-)?deh(?:\s+nom)?|\u044d\u0445\u043d\u0438\u0439(?:\s+\u043d\u043e\u043c)?|\u043d\u044d\u0433(?:\s|-)?\u0434\u044d\u0445(?:\s+\u043d\u043e\u043c)?)$/i;
+
+const SECOND_REFERENCE_QUERY_PATTERN =
+  /^(?:(?:the\s+)?(?:second|2nd)(?:\s+(?:one|book|title))?|hoyr(?:\s|-)?dah(?:i)?(?:\s+nom)?|\u0445\u043e\u0451\u0440(?:\s|-)?\u0434\u0430\u0445(?:\s+\u043d\u043e\u043c)?)$/i;
+
+const THIRD_REFERENCE_QUERY_PATTERN =
+  /^(?:(?:the\s+)?(?:third|3rd)(?:\s+(?:one|book|title))?|gurav(?:\s|-)?dah(?:i)?(?:\s+nom)?|\u0433\u0443\u0440\u0430\u0432(?:\s|-)?\u0434\u0430\u0445(?:\s+\u043d\u043e\u043c)?)$/i;
+
+const LAST_REFERENCE_QUERY_PATTERN =
+  /^(?:(?:the\s+)?(?:last|final)(?:\s+(?:one|book|title))?|suuliin(?:\s+nom)?|\u0441\u04af\u04af\u043b\u0438\u0439\u043d(?:\s+\u043d\u043e\u043c)?)$/i;
+
+const isReferentialFollowUpQuery = (query: string) => {
+  const normalized = normalizeIntentText(query);
+
+  return (
+    GENERIC_REFERENCE_QUERY_PATTERN.test(normalized) ||
+    FIRST_REFERENCE_QUERY_PATTERN.test(normalized) ||
+    SECOND_REFERENCE_QUERY_PATTERN.test(normalized) ||
+    THIRD_REFERENCE_QUERY_PATTERN.test(normalized) ||
+    LAST_REFERENCE_QUERY_PATTERN.test(normalized)
+  );
+};
+
+const resolveReferencedTitleFromOptions = (text: string, titles: string[]) => {
+  if (!titles.length) {
+    return "";
+  }
+
+  if (titles.length === 1) {
+    return titles[0];
+  }
+
+  const normalized = normalizeIntentText(detectAssistantIntent(text).query || text);
+
+  if (FIRST_REFERENCE_QUERY_PATTERN.test(normalized)) {
+    return titles[0] ?? "";
+  }
+
+  if (SECOND_REFERENCE_QUERY_PATTERN.test(normalized)) {
+    return titles[1] ?? "";
+  }
+
+  if (THIRD_REFERENCE_QUERY_PATTERN.test(normalized)) {
+    return titles[2] ?? "";
+  }
+
+  if (LAST_REFERENCE_QUERY_PATTERN.test(normalized)) {
+    return titles[titles.length - 1] ?? "";
+  }
+
+  return "";
+};
+
 export const detectAssistantIntent = (text: string): AssistantIntent => {
   const normalized = normalizeAssistantText(text);
 
@@ -306,6 +370,10 @@ export const detectAssistantIntent = (text: string): AssistantIntent => {
 
   if (isLoanOverviewQuestion(text) || hasLoanOverviewHint(text)) {
     return { kind: "loans", query: "" };
+  }
+
+  if (isReadableBooksQuestion(text)) {
+    return { kind: "readable", query: "" };
   }
 
   const returnQuery = extractQueryByPatterns(text, ACTION_CAPTURE_PATTERNS.return);
@@ -375,6 +443,14 @@ export const inferFollowUpTargetFromHistory = ({
     }
 
     const titles = extractCatalogTitlesFromAssistantMessage(message.content);
+    const referencedTitle = resolveReferencedTitleFromOptions(text, titles);
+
+    if (referencedTitle) {
+      return {
+        query: referencedTitle,
+        options: [] as string[],
+      };
+    }
 
     if (titles.length === 1) {
       return {
@@ -437,10 +513,22 @@ const buildUnavailableReply = (language: AssistantLanguage, reason: string) =>
     ? `Одоогоор library backend холбогдохгүй байна: ${reason}`
     : `The library backend is unavailable right now: ${reason}`;
 
+const buildBookAccessHint = (book: Book, language: AssistantLanguage) => {
+  if (canReadBookNow(book)) {
+    return language === "mn" ? "\u0448\u0443\u0443\u0434 \u0443\u043d\u0448\u0438\u0436 \u0431\u043e\u043b\u043d\u043e" : "read now";
+  }
+
+  if (book.available_copies > 0) {
+    return language === "mn" ? "\u0448\u0443\u0443\u0434 \u0437\u044d\u044d\u043b\u0436 \u0431\u043e\u043b\u043d\u043e" : "borrow now";
+  }
+
+  return language === "mn" ? "\u0437\u04e9\u0432\u0445\u04e9\u043d \u0437\u0430\u0445\u0438\u0430\u043b\u043d\u0430" : "request only";
+};
+
 const formatBookLine = (book: Book, language: AssistantLanguage) =>
   `• ${book.title} — ${book.author} (${book.genre}, ${book.available_copies}/${book.total_copies} ${
     language === "mn" ? "боломжтой" : "available"
-  })`;
+  }, ${buildBookAccessHint(book, language)})`;
 
 const scoreBookCandidate = (book: Book, query: string) => {
   const normalizedQuery = normalizeAssistantText(query);
@@ -536,6 +624,33 @@ const buildLoansReply = async (userId: string | undefined, language: AssistantLa
 
         return `• ${loan.book.title} — ${loan.book.author} (${statusLabel}${duePart})`;
       }),
+    ].join("\n"),
+  };
+};
+
+const buildReadableBooksReply = async (language: AssistantLanguage): Promise<LocalAssistantReply> => {
+  const books = await fetchPublicReadableBooks(6);
+
+  if (!books.length) {
+    return {
+      handled: true,
+      reply:
+        language === "mn"
+          ? "\u041e\u0434\u043e\u043e\u0433\u043e\u043e\u0440 \u0448\u0443\u0443\u0434 \u0443\u043d\u0448\u0438\u0436 \u0431\u043e\u043b\u043e\u0445 \u043d\u043e\u043c \u043e\u043b\u0434\u0441\u043e\u043d\u0433\u04af\u0439."
+          : "I could not find any on-site reader titles right now.",
+    };
+  }
+
+  return {
+    handled: true,
+    reply: [
+      language === "mn"
+        ? "\u0428\u0443\u0443\u0434 \u0443\u043d\u0448\u0438\u0436 \u0431\u043e\u043b\u043e\u0445 \u043d\u043e\u043c\u0443\u0443\u0434:"
+        : "These titles can be opened and read right away:",
+      ...books.map((book) => formatBookLine(book, language)),
+      language === "mn"
+        ? "Catalog card-\u0430\u0430\u0441 \u043d\u044c reader-\u0438\u0439\u0433 \u0448\u0443\u0443\u0434 \u043d\u044d\u044d\u0436 \u0431\u043e\u043b\u043d\u043e."
+        : "You can open any of them directly from the catalog reader button.",
     ].join("\n"),
   };
 };
@@ -805,8 +920,12 @@ export const resolveLocalAssistantReply = async ({
 }): Promise<LocalAssistantReply> => {
   const language = detectAssistantLanguage(text);
   const intent = detectAssistantIntent(text);
+  const canResolveActionFromHistory =
+    intent.kind === "borrow" || intent.kind === "request" || intent.kind === "return";
+  const shouldResolveFollowUpTarget =
+    canResolveActionFromHistory && (!intent.query || isReferentialFollowUpQuery(intent.query));
   const followUpTarget =
-    !intent.query && (intent.kind === "borrow" || intent.kind === "request" || intent.kind === "return")
+    shouldResolveFollowUpTarget
       ? inferFollowUpTargetFromHistory({
           text,
           intentKind: intent.kind,
@@ -814,7 +933,7 @@ export const resolveLocalAssistantReply = async ({
         })
       : { query: "", options: [] as string[] };
 
-  if (!intent.query && followUpTarget.options.length > 1) {
+  if (shouldResolveFollowUpTarget && !followUpTarget.query && followUpTarget.options.length > 1) {
     return {
       handled: true,
       reply: [
@@ -826,13 +945,15 @@ export const resolveLocalAssistantReply = async ({
     };
   }
 
-  const resolvedQuery = intent.query || followUpTarget.query;
+  const resolvedQuery = shouldResolveFollowUpTarget ? followUpTarget.query : intent.query || followUpTarget.query;
 
   switch (intent.kind) {
     case "capabilities":
       return { handled: true, reply: buildCapabilitiesReply(language) };
     case "loans":
       return buildLoansReply(userId, language);
+    case "readable":
+      return buildReadableBooksReply(language);
     case "recommend":
       return buildRecommendationReply({ userId, profile, query: resolvedQuery, language });
     case "borrow":
