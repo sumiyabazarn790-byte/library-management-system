@@ -37,6 +37,15 @@ describe("publicDomainBooks helpers", () => {
     ).toBe("https://www.gutenberg.org/ebooks/84");
   });
 
+  it("links Google Books discovery pages for the added free reader shelf", () => {
+    expect(
+      getPublicDomainReaderUrl({
+        title: "Jane Eyre",
+        author: "Charlotte Bronte",
+      }),
+    ).toContain("books.google.com");
+  });
+
   it("returns null fallback sections for unmapped books", () => {
     expect(
       getPublicDomainFallbackSections({

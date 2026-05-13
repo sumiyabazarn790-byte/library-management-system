@@ -31,6 +31,54 @@ const PUBLIC_DOMAIN_BOOKS: Record<string, PublicDomainBookRecord> = {
     ebookId: "146",
     readerUrl: "https://www.gutenberg.org/ebooks/146",
   },
+  "charlotte bronte::jane eyre": {
+    ebookId: "1260",
+    readerUrl: "https://books.google.com/books?q=Jane+Eyre+Charlotte+Bronte&as_brr=1",
+  },
+  "herman melville::moby-dick": {
+    ebookId: "2701",
+    readerUrl: "https://books.google.com/books?q=Moby-Dick+Herman+Melville&as_brr=1",
+  },
+  "h. g. wells::the time machine": {
+    ebookId: "35",
+    readerUrl: "https://books.google.com/books?q=The+Time+Machine+H.+G.+Wells&as_brr=1",
+  },
+  "h. g. wells::the war of the worlds": {
+    ebookId: "36",
+    readerUrl: "https://books.google.com/books?q=The+War+of+the+Worlds+H.+G.+Wells&as_brr=1",
+  },
+  "lewis carroll::alice's adventures in wonderland": {
+    ebookId: "11",
+    readerUrl: "https://books.google.com/books?q=Alice%27s+Adventures+in+Wonderland+Lewis+Carroll&as_brr=1",
+  },
+  "robert louis stevenson::treasure island": {
+    ebookId: "120",
+    readerUrl: "https://books.google.com/books?q=Treasure+Island+Robert+Louis+Stevenson&as_brr=1",
+  },
+  "oscar wilde::the picture of dorian gray": {
+    ebookId: "174",
+    readerUrl: "https://books.google.com/books?q=The+Picture+of+Dorian+Gray+Oscar+Wilde&as_brr=1",
+  },
+  "plato::the republic": {
+    ebookId: "1497",
+    readerUrl: "https://books.google.com/books?q=The+Republic+Plato&as_brr=1",
+  },
+  "niccolo machiavelli::the prince": {
+    ebookId: "1232",
+    readerUrl: "https://books.google.com/books?q=The+Prince+Niccolo+Machiavelli&as_brr=1",
+  },
+  "walt whitman::leaves of grass": {
+    ebookId: "1322",
+    readerUrl: "https://books.google.com/books?q=Leaves+of+Grass+Walt+Whitman&as_brr=1",
+  },
+  "rudyard kipling::the jungle book": {
+    ebookId: "236",
+    readerUrl: "https://books.google.com/books?q=The+Jungle+Book+Rudyard+Kipling&as_brr=1",
+  },
+  "bram stoker::dracula": {
+    ebookId: "345",
+    readerUrl: "https://books.google.com/books?q=Dracula+Bram+Stoker&as_brr=1",
+  },
 };
 
 const toPublicDomainBookKey = (book: Pick<Book, "title" | "author">) =>

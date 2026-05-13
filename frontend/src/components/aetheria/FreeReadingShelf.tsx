@@ -26,7 +26,7 @@ export const FreeReadingShelf = ({
 
       try {
         // Primary data: the books themselves
-        const readableBooks = await fetchPublicReadableBooks(8);
+        const readableBooks = await fetchPublicReadableBooks(12);
         const bookIds = readableBooks.map((book) => book.id);
 
         // Secondary data: user-specific statuses
