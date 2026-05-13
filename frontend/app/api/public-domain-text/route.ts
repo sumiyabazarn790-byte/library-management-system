@@ -31,13 +31,21 @@ const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_OPENAI_TRANSLATE_MODEL = "gpt-4.1-mini";
 const MAX_TRANSLATION_BATCH_SECTIONS = 12;
 const MAX_TRANSLATION_BATCH_CHARS = 7200;
+const OPENAI_TRANSLATION_BATCH_CONCURRENCY = 2;
 const GOOGLE_TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single";
 const GOOGLE_TRANSLATE_BATCH_SECTIONS = 6;
 const GOOGLE_TRANSLATE_BATCH_CHARS = 2200;
+const GOOGLE_TRANSLATION_BATCH_CONCURRENCY = 4;
 const GOOGLE_SECTION_BREAK = "\n\n[[AETHERIA_SECTION_BREAK]]\n\n";
 const TEXT_HEADERS = {
   Accept: "text/plain; charset=utf-8",
   "User-Agent": "Aetheria Reader/1.0",
+};
+const READER_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+};
+const FALLBACK_READER_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=300, s-maxage=600",
 };
 
 const LOCAL_ENV_CANDIDATES = [
@@ -284,6 +292,34 @@ const chunkSectionsForTranslation = (sections: string[]) =>
 const chunkSectionsForGoogleTranslation = (sections: string[]) =>
   chunkSections(sections, GOOGLE_TRANSLATE_BATCH_SECTIONS, GOOGLE_TRANSLATE_BATCH_CHARS);
 
+const translateBatchesWithConcurrency = async (
+  batches: string[][],
+  concurrency: number,
+  translateBatch: (sections: string[]) => Promise<string[]>,
+) => {
+  const translatedBatches = new Array<string[]>(batches.length);
+  let nextBatchIndex = 0;
+
+  const runWorker = async () => {
+    while (nextBatchIndex < batches.length) {
+      const batchIndex = nextBatchIndex;
+      nextBatchIndex += 1;
+
+      const batch = batches[batchIndex];
+      if (!batch) {
+        continue;
+      }
+
+      translatedBatches[batchIndex] = await translateBatch(batch);
+    }
+  };
+
+  const workerCount = Math.min(Math.max(1, concurrency), batches.length);
+  await Promise.all(Array.from({ length: workerCount }, runWorker));
+
+  return translatedBatches.flatMap((batch) => batch ?? []);
+};
+
 const buildTranslationCacheKey = (sourceBook: SourceBook, sections: string[]) => {
   const firstSection = sections[0]?.replace(/\s+/g, " ").slice(0, 140) ?? "";
   const lastSection = sections.at(-1)?.replace(/\s+/g, " ").slice(-140) ?? "";
@@ -360,6 +396,13 @@ const translateSectionBatch = async (sections: string[], sourceBook: SourceBook)
   return translatedSections;
 };
 
+const translateSectionsWithOpenAI = async (sections: string[], sourceBook: SourceBook) =>
+  translateBatchesWithConcurrency(
+    chunkSectionsForTranslation(sections),
+    OPENAI_TRANSLATION_BATCH_CONCURRENCY,
+    (batch) => translateSectionBatch(batch, sourceBook),
+  );
+
 const extractGoogleTranslatedText = (payload: unknown) => {
   if (!Array.isArray(payload) || !Array.isArray(payload[0])) {
     return null;
@@ -408,15 +451,12 @@ const translateSectionBatchWithGoogle = async (sections: string[]) => {
   return translatedSections;
 };
 
-const translateSectionsWithGoogle = async (sections: string[]) => {
-  const translatedSections: string[] = [];
-
-  for (const batch of chunkSectionsForGoogleTranslation(sections)) {
-    translatedSections.push(...(await translateSectionBatchWithGoogle(batch)));
-  }
-
-  return translatedSections;
-};
+const translateSectionsWithGoogle = async (sections: string[]) =>
+  translateBatchesWithConcurrency(
+    chunkSectionsForGoogleTranslation(sections),
+    GOOGLE_TRANSLATION_BATCH_CONCURRENCY,
+    translateSectionBatchWithGoogle,
+  );
 
 const translateSectionsToMongolian = async (
   sections: string[],
@@ -442,12 +482,7 @@ const translateSectionsToMongolian = async (
   }
 
   try {
-    const translatedSections: string[] = [];
-
-    for (const batch of chunkSectionsForTranslation(sections)) {
-      translatedSections.push(...(await translateSectionBatch(batch, sourceBook)));
-    }
-
+    const translatedSections = await translateSectionsWithGoogle(sections);
     translationCache.set(cacheKey, translatedSections);
 
     return {
@@ -455,11 +490,11 @@ const translateSectionsToMongolian = async (
       translated: true,
       displayLanguage: "mn",
     };
-  } catch (openAiError) {
-    console.warn("OpenAI reader translation failed, trying Google fallback", toErrorMessage(openAiError));
+  } catch (googleError) {
+    console.warn("Google reader translation failed, trying OpenAI fallback", toErrorMessage(googleError));
 
     try {
-      const translatedSections = await translateSectionsWithGoogle(sections);
+      const translatedSections = await translateSectionsWithOpenAI(sections, sourceBook);
       translationCache.set(cacheKey, translatedSections);
 
       return {
@@ -467,8 +502,8 @@ const translateSectionsToMongolian = async (
         translated: true,
         displayLanguage: "mn",
       };
-    } catch (googleError) {
-      console.warn("Google reader translation fallback failed", toErrorMessage(googleError));
+    } catch (openAiError) {
+      console.warn("OpenAI reader translation fallback failed", toErrorMessage(openAiError));
 
       return {
         sections,
@@ -504,16 +539,21 @@ const buildResponse = async ({
           displayLanguage: "original" as const,
         };
 
-  return NextResponse.json({
-    sections: translation.sections,
-    sourceUrl: readerUrl,
-    readerUrl,
-    fallback,
-    requestedLanguage,
-    displayLanguage: translation.displayLanguage,
-    translated: translation.translated,
-    message: mergeMessages(message, translation.message),
-  });
+  return NextResponse.json(
+    {
+      sections: translation.sections,
+      sourceUrl: readerUrl,
+      readerUrl,
+      fallback,
+      requestedLanguage,
+      displayLanguage: translation.displayLanguage,
+      translated: translation.translated,
+      message: mergeMessages(message, translation.message),
+    },
+    {
+      headers: fallback ? FALLBACK_READER_CACHE_HEADERS : READER_CACHE_HEADERS,
+    },
+  );
 };
 
 export async function GET(request: Request) {
