@@ -14,6 +14,7 @@ type ChatMessage = {
 type AssistantLanguage = "mn" | "en";
 
 type AssistantIntentKind =
+  | "greeting"
   | "capabilities"
   | "loans"
   | "recommend"
@@ -101,7 +102,7 @@ const ACTION_CAPTURE_PATTERNS = {
     /hai(?:h)?\s+(.+)/i,
     /ol(?:oh)?\s+(.+)/i,
   ],
-} satisfies Record<Exclude<AssistantIntentKind, "capabilities" | "loans" | "unknown">, RegExp[]>;
+} satisfies Record<Exclude<AssistantIntentKind, "greeting" | "capabilities" | "loans" | "unknown">, RegExp[]>;
 
 const ROMANIZED_MONGOLIAN_TOKENS = [
   "minii",
@@ -261,6 +262,14 @@ const isCapabilityQuestion = (text: string) =>
     text,
   );
 
+const isGreeting = (text: string) => {
+  const normalized = normalizeIntentText(text).replace(/[!?.]+$/g, "");
+
+  return /^(?:hi|hello|hey|yo|good morning|good afternoon|good evening|sain uu|sain baina uu|sain bnu|sainuu|sn uu|\u0441\u0430\u0439\u043d \u0443\u0443|\u0441\u0430\u0439\u043d \u0431\u0430\u0439\u043d\u0430 \u0443\u0443)$/.test(
+    normalized,
+  );
+};
+
 const isLoanOverviewQuestion = (text: string) =>
   /(миний\s+(?:loan|loans|зээл|зээлсэн|захиалсан)|өөрийн\s+loans|show\s+my\s+loans|my\s+(?:loans|borrowed books|requested books)|current\s+loans|list\s+my\s+loans|minii\s+(?:loan|loans|zeelsen|zahialsan)|due\s+books)/i.test(
     text,
@@ -296,6 +305,10 @@ const isShortCatalogQuery = (text: string) => {
     return false;
   }
 
+  if (isGreeting(text)) {
+    return false;
+  }
+
   return !/(what|why|how|when|where|who|яагаад|хэзээ|хаана|хэн)/i.test(normalized);
 };
 
@@ -304,6 +317,10 @@ const detectAssistantIntent = (text: string): AssistantIntent => {
 
   if (!normalized) {
     return { kind: "unknown", query: "" };
+  }
+
+  if (isGreeting(text)) {
+    return { kind: "greeting", query: "" };
   }
 
   if (isCapabilityQuestion(text)) {
@@ -388,6 +405,11 @@ const buildCapabilitiesReply = (language: AssistantLanguage) =>
         "• Search by meaning (semantic search)",
         "• Understand both Mongolian and English",
       ].join("\n");
+
+const buildGreetingReply = (language: AssistantLanguage) =>
+  language === "mn"
+    ? "\u0421\u0430\u0439\u043d \u0443\u0443! \u0411\u0438 Aetheria AI. \u041d\u043e\u043c \u0445\u0430\u0439\u0445, \u0441\u0430\u043d\u0430\u043b \u0431\u043e\u043b\u0433\u043e\u0445, \u0437\u044d\u044d\u043b\u044d\u0445, \u044d\u0441\u0432\u044d\u043b \u0442\u0430\u043d\u044b loans-\u0438\u0439\u0433 \u0445\u0430\u0440\u0430\u0445\u0430\u0434 \u0442\u0443\u0441\u0430\u043b\u0436 \u0447\u0430\u0434\u043d\u0430."
+    : "Hi! I am Aetheria AI. I can help you search books, get recommendations, borrow titles, or check your loans.";
 
 const buildSignInReply = (language: AssistantLanguage) =>
   language === "mn"
@@ -849,6 +871,8 @@ const buildHandledReply = async ({
   lovableApiKey?: string | null;
 }) => {
   switch (intent.kind) {
+    case "greeting":
+      return buildGreetingReply(language);
     case "capabilities":
       return buildCapabilitiesReply(language);
     case "search": {

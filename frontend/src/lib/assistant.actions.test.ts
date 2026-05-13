@@ -110,6 +110,18 @@ describe("assistant action handling", () => {
     supabaseMocks.rpc.mockResolvedValue({ error: null });
   });
 
+  it("answers greetings without catalog search", async () => {
+    const reply = await assistant.resolveLocalAssistantReply({
+      text: "hi",
+      userId: "user-1",
+      profile: baseProfile,
+    });
+
+    expect(reply.handled).toBe(true);
+    expect(reply.reply).toContain("Hi!");
+    expect(libraryMocks.searchBooks).not.toHaveBeenCalled();
+  });
+
   it("returns catalog matches for search prompts", async () => {
     libraryMocks.searchBooks.mockResolvedValue([
       baseBook(),

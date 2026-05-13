@@ -9,6 +9,17 @@ beforeAll(async () => {
 });
 
 describe("assistant intent detection", () => {
+  it("detects greetings without searching the catalog", () => {
+    expect(assistant.detectAssistantIntent("hi")).toEqual({
+      kind: "greeting",
+      query: "",
+    });
+    expect(assistant.detectAssistantIntent("sain uu")).toEqual({
+      kind: "greeting",
+      query: "",
+    });
+  });
+
   it("detects loan overview questions", () => {
     expect(assistant.detectAssistantIntent("minii loans")).toEqual({
       kind: "loans",
