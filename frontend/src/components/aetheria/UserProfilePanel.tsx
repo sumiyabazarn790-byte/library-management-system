@@ -1,20 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
   BookCopy,
+  Camera,
   Clock3,
+  ImageUp,
   Loader2,
   Mail,
   Save,
   Shield,
   Sparkles,
+  Trash2,
   User,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchLoanStatusesByBookIds, fetchLoans, fetchSavedBooks, formatLibraryDate } from "@/lib/library";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import heroCosmos from "@/assets/hero-cosmos.jpg";
@@ -52,6 +55,30 @@ const normalizeGenres = (value: string) =>
   );
 
 const fallbackGenres = ["Quantum Physics", "Stoic Philosophy", "Rare Archives"];
+const AVATAR_BUCKET = "profile-avatars";
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+
+const getFileExtension = (file: File) => {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+
+  if (extension && /^[a-z0-9]+$/.test(extension)) {
+    return extension;
+  }
+
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/webp") return "webp";
+  if (file.type === "image/gif") return "gif";
+
+  return "jpg";
+};
+
+const readFileAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("Avatar preview failed"));
+    reader.readAsDataURL(file);
+  });
 
 const resolveCollectionCard = (genre: string, index: number): CollectionCard => {
   const normalized = genre.toLowerCase();
@@ -112,9 +139,12 @@ const resolveCollectionCard = (genre: string, index: number): CollectionCard => 
 
 export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePanelProps) => {
   const { user, profile, isAdmin, refreshProfile } = useAuth();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [displayName, setDisplayName] = useState("");
   const [preferredGenres, setPreferredGenres] = useState("");
   const [saving, setSaving] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [loanStats, setLoanStats] = useState({ active: 0, requested: 0, total: 0 });
   const [savedBooks, setSavedBooks] = useState<SavedBookWithBook[]>([]);
   const [savedLoanStatusByBookId, setSavedLoanStatusByBookId] = useState<Record<string, LoanStatus>>({});
@@ -126,6 +156,10 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
     setDisplayName(profile?.display_name ?? metadataDisplayName);
     setPreferredGenres((profile?.preferred_genres ?? []).join(", "));
   }, [metadataDisplayName, profile]);
+
+  useEffect(() => {
+    setAvatarPreview(null);
+  }, [profile?.avatar_url]);
 
   useEffect(() => {
     if (!user) {
@@ -217,6 +251,14 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
   }, [metadataDisplayName, profile?.display_name, user?.email]);
 
   const profileName = profile?.display_name?.trim() || metadataDisplayName || user?.email?.split("@")[0] || "Aetheria Reader";
+  const metadataAvatarUrl =
+    typeof user?.user_metadata?.avatar_url === "string"
+      ? user.user_metadata.avatar_url.trim()
+      : typeof user?.user_metadata?.picture === "string"
+        ? user.user_metadata.picture.trim()
+        : "";
+  const storedProfileAvatarUrl = profile ? (profile.avatar_url?.trim() ?? "") : metadataAvatarUrl;
+  const profileAvatarUrl = avatarPreview ?? storedProfileAvatarUrl;
   const joinedLabel = profile ? formatLibraryDate(profile.created_at) : "Unknown";
   const genreList = (profile?.preferred_genres ?? []).filter((genre): genre is string => Boolean(genre));
 
@@ -277,6 +319,107 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
     }
   };
 
+  const persistAvatarUrl = async (nextAvatarUrl: string | null) => {
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({
+        id: user.id,
+        avatar_url: nextAvatarUrl,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "id" });
+
+    if (error) {
+      throw error;
+    }
+
+    const { error: updateUserError } = await supabase.auth.updateUser({
+      data: {
+        avatar_url: nextAvatarUrl,
+      },
+    });
+
+    if (updateUserError) {
+      console.warn("profile avatar metadata sync failed", updateUserError);
+    }
+
+    await refreshProfile();
+    onProfileChange?.();
+  };
+
+  const handleAvatarFile = async (file: File | undefined) => {
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Profile zurag ni image file baih yostoi.");
+      return;
+    }
+
+    if (file.size > MAX_AVATAR_BYTES) {
+      toast.error("Profile zurag 2MB-aas baga baih yostoi.");
+      return;
+    }
+
+    setAvatarBusy(true);
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setAvatarPreview(dataUrl);
+
+      let nextAvatarUrl = dataUrl;
+
+      try {
+        const extension = getFileExtension(file);
+        const avatarPath = `${user.id}/avatar-${Date.now()}.${extension}`;
+        const { error: uploadError } = await supabase.storage
+          .from(AVATAR_BUCKET)
+          .upload(avatarPath, file, {
+            cacheControl: "3600",
+            contentType: file.type,
+            upsert: true,
+          });
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(avatarPath);
+        nextAvatarUrl = data.publicUrl;
+      } catch (storageError) {
+        console.warn("avatar storage upload failed, using data URL fallback", storageError);
+      }
+
+      await persistAvatarUrl(nextAvatarUrl);
+      setAvatarPreview(nextAvatarUrl);
+      toast.success("Profile zurag shinechlegdlee.");
+    } catch (error) {
+      setAvatarPreview(null);
+      const message = error instanceof Error ? error.message : "Avatar upload failed";
+      toast.error(message);
+    } finally {
+      setAvatarBusy(false);
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setAvatarBusy(true);
+
+    try {
+      setAvatarPreview(null);
+      await persistAvatarUrl(null);
+      toast.success("Profile zurag ustgagdlaa.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Avatar remove failed";
+      toast.error(message);
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
   return (
     <section id="profile" className="scroll-mt-24">
       <div className="space-y-8">
@@ -294,14 +437,15 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.45fr_minmax(320px,0.8fr)]">
-          <article className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[#07101b] shadow-[0_30px_90px_rgba(0,0,0,0.45)]">
+          <article className="relative overflow-hidden rounded-[34px] border border-cyan-200/15 bg-[#07101b] shadow-[0_34px_110px_rgba(0,0,0,0.5)]">
             <img
               src={heroCosmos.src}
               alt="Profile cosmic atlas background"
               className="absolute inset-0 h-full w-full object-cover opacity-80"
             />
-            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(3,7,18,0.88),rgba(3,7,18,0.34)_44%,rgba(12,28,54,0.78))]" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(96,165,250,0.22),transparent_42%),radial-gradient(circle_at_78%_22%,rgba(255,255,255,0.16),transparent_24%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(3,7,18,0.92),rgba(4,20,35,0.46)_44%,rgba(12,28,54,0.82))]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_28%,rgba(125,211,252,0.26),transparent_34%),radial-gradient(circle_at_76%_18%,rgba(167,139,250,0.22),transparent_28%)]" />
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/50 to-transparent" />
 
             <div className="relative flex min-h-[360px] flex-col justify-between p-5 sm:p-7 md:min-h-[420px] md:p-10">
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -314,12 +458,33 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
               </div>
 
               <div className="space-y-6">
-                <div className="flex flex-wrap items-center gap-4">
-                  <Avatar className="size-20 border border-white/20 bg-white/10 text-white shadow-[0_0_45px_rgba(96,165,250,0.22)]">
-                    <AvatarFallback className="bg-gradient-accent text-xl font-semibold text-primary-foreground">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
+                <div className="flex flex-wrap items-center gap-5">
+                  <div className="group relative">
+                    <Avatar className="size-24 border border-cyan-200/35 bg-white/10 text-white shadow-[0_0_55px_rgba(96,165,250,0.28)] ring-4 ring-black/20 md:size-28">
+                      {profileAvatarUrl ? (
+                        <AvatarImage src={profileAvatarUrl} alt={`${profileName} profile photo`} className="object-cover" />
+                      ) : null}
+                      <AvatarFallback className="bg-gradient-accent text-2xl font-semibold text-primary-foreground">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={avatarBusy}
+                      className="absolute -bottom-1 -right-1 flex size-10 items-center justify-center rounded-full border border-white/20 bg-cyan-300 text-slate-950 shadow-[0_12px_30px_rgba(34,211,238,0.32)] transition-transform hover:scale-105 disabled:opacity-60"
+                      aria-label="Upload profile photo"
+                    >
+                      {avatarBusy ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
+                    </button>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      className="hidden"
+                      onChange={(event) => void handleAvatarFile(event.target.files?.[0])}
+                    />
+                  </div>
                   <div className="min-w-0">
                     <p className="text-sm uppercase tracking-[0.26em] text-sky-200/80">Profile Signature</p>
                     <h3 className="mt-2 font-display text-3xl font-semibold leading-none text-white md:text-5xl">
@@ -329,6 +494,28 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
                       <Mail className="size-4 text-sky-300" />
                       <span className="truncate">{user.email}</span>
                     </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => avatarInputRef.current?.click()}
+                        disabled={avatarBusy}
+                        className="inline-flex h-9 items-center gap-2 rounded-full border border-cyan-200/20 bg-cyan-300/12 px-4 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/18 disabled:opacity-60"
+                      >
+                        <ImageUp className="size-3.5" />
+                        Zurag solih
+                      </button>
+                      {profileAvatarUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleRemoveAvatar()}
+                          disabled={avatarBusy}
+                          className="inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-black/20 px-4 text-xs font-semibold text-white/72 transition-colors hover:bg-white/10 disabled:opacity-60"
+                        >
+                          <Trash2 className="size-3.5" />
+                          Ustgah
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 

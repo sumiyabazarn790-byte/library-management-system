@@ -77,6 +77,7 @@ const activeLoan = (book: Book, overrides: Partial<LoanWithBook> = {}): LoanWith
 const baseProfile: Profile = {
   id: "user-1",
   display_name: "Reader",
+  avatar_url: null,
   preferred_genres: ["Science Fiction"],
   role: "member",
   created_at: "2026-05-01T00:00:00.000Z",

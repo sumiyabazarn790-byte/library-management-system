@@ -10,6 +10,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sheet,
   SheetClose,
@@ -52,6 +53,19 @@ export const TopNav = () => {
   const metadataDisplayName =
     typeof user?.user_metadata?.display_name === "string" ? user.user_metadata.display_name.trim() : "";
   const profileLabel = profile?.display_name?.trim() || metadataDisplayName || user?.email?.split("@")[0] || "Profile";
+  const metadataAvatarUrl =
+    typeof user?.user_metadata?.avatar_url === "string"
+      ? user.user_metadata.avatar_url.trim()
+      : typeof user?.user_metadata?.picture === "string"
+        ? user.user_metadata.picture.trim()
+        : "";
+  const profileAvatarUrl = profile ? (profile.avatar_url?.trim() ?? "") : metadataAvatarUrl;
+  const profileInitials = profileLabel
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
 
   useEffect(() => {
     let canceled = false;
@@ -350,10 +364,17 @@ export const TopNav = () => {
             <>
               <button
                 onClick={() => handleSectionClick("profile")}
-                className="hidden h-10 max-w-44 items-center gap-2 rounded-lg bg-surface-high/70 px-3.5 text-sm font-semibold text-foreground transition-all duration-200 hover:bg-surface-high md:flex"
+                className="hidden h-10 max-w-48 items-center gap-2 rounded-lg bg-surface-high/70 px-2.5 pr-3.5 text-sm font-semibold text-foreground transition-all duration-200 hover:bg-surface-high md:flex"
                 aria-label="Open profile"
               >
-                <User className="size-4 shrink-0" />
+                <Avatar className="size-7 border border-primary/25 bg-background">
+                  {profileAvatarUrl ? (
+                    <AvatarImage src={profileAvatarUrl} alt={`${profileLabel} profile photo`} className="object-cover" />
+                  ) : null}
+                  <AvatarFallback className="bg-gradient-accent text-[10px] font-semibold text-primary-foreground">
+                    {profileInitials || <User className="size-3.5" />}
+                  </AvatarFallback>
+                </Avatar>
                 <span className="truncate">{profileLabel}</span>
               </button>
               <button

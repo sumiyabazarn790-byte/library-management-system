@@ -19,6 +19,7 @@ export type ProfileRole = "member" | "admin";
 export type Profile = {
   id: string;
   display_name: string | null;
+  avatar_url: string | null;
   preferred_genres: string[] | null;
   role: ProfileRole;
   created_at: string;
