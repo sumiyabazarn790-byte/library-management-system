@@ -119,6 +119,14 @@ const Auth = () => {
       return;
     }
 
+    if (mode === "signup" && result.manualSignInRequired) {
+      setConfirmationEmail("");
+      setMode("signin");
+      setFormError(null);
+      toast.success("Burtgel uuslee. Odoo email, nuuts ugeeree nevterne uu.");
+      return;
+    }
+
     setConfirmationEmail("");
     setFormError(null);
     toast.success(mode === "signin" ? "Tavtai moril." : "Burtgel amjilttai.");

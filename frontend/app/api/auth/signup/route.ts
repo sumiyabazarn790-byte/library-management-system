@@ -124,6 +124,7 @@ export async function POST(request: Request) {
       error: null,
       reason: null,
       emailConfirmationRequired: false,
+      manualSignInRequired: !session,
       session,
     });
   } catch (error) {

@@ -293,15 +293,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.warn("signup session bootstrap skipped", setSessionError.message);
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password,
-    });
-
-    return {
-      ...mapAuthError(error?.message),
-      emailConfirmationRequired: false,
-    };
+    return signupResult;
   };
 
   const signInWithGoogle: AuthCtx["signInWithGoogle"] = async (nextPath) => {

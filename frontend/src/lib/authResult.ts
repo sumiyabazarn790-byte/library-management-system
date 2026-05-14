@@ -11,6 +11,7 @@ export type AuthResult = {
   error: string | null;
   reason?: AuthReason | null;
   emailConfirmationRequired?: boolean;
+  manualSignInRequired?: boolean;
   autoConfirmed?: boolean;
   session?: {
     access_token: string;
