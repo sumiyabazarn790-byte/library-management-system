@@ -12,7 +12,7 @@
     "clean:dev": "node --input-type=module -e \"import { rmSync } from 'node:fs'; for (const path of ['.next-dev', 'tsconfig.tsbuildinfo']) { rmSync(path, { recursive: true, force: true }); }\"",
     "dev:clean": "npm run clean:dev && next dev",
     "build": "next build",
-    "start": "node .next/standalone/server.js",
+    "start": "node scripts/start-production.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest"

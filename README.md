@@ -19,6 +19,22 @@ npm run db:push:linked
 npm run seed:books    # Seed demo book data
 ```
 
+## Render Deploy
+
+If you deploy on Render, this repo now includes `render.yaml` so Render can use the correct commands automatically:
+
+```bash
+build: npm ci && npm run build
+start: npm start
+```
+
+Important:
+
+- The app must build before start, otherwise Next.js standalone output will be missing and Render can return `502 Bad Gateway`.
+- `npm start` now self-checks for `.next/standalone/server.js` and runs a build if the artifact is missing, which helps when a hosted service was created with an incomplete start/build setup.
+- In Render environment variables, set `NEXT_PUBLIC_SUPABASE_URL` to your hosted Supabase URL, and set `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to your public key.
+- For signup/admin sync routes, also set `SUPABASE_SERVICE_ROLE_KEY` in the server environment.
+
 ## Demo Data
 
 The repository includes comprehensive demo book data to help with testing and demonstration:
