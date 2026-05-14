@@ -20,7 +20,7 @@ const isLoopbackUrl = (value) => {
   return hostname ? LOOPBACK_HOSTS.has(hostname) : false;
 };
 
-const reportHostedSupabaseEnvIssues = () => {
+const validateHostedSupabaseEnv = () => {
   if (!isHostedBuild || process.env.SKIP_DEPLOY_ENV_VALIDATION === "1") {
     return;
   }
@@ -45,13 +45,13 @@ const reportHostedSupabaseEnvIssues = () => {
   }
 
   if (issues.length > 0) {
-    console.warn(
-      `Invalid hosted Supabase configuration:\n- ${issues.join("\n- ")}\nThe app will still build, but Supabase-powered features may not work until you fix the deployment environment values and redeploy.`,
+    throw new Error(
+      `Invalid hosted Supabase configuration:\n- ${issues.join("\n- ")}\nSet the values in Render/Vercel and redeploy.`,
     );
   }
 };
 
-reportHostedSupabaseEnvIssues();
+validateHostedSupabaseEnv();
 
 const nextConfig = {
   reactStrictMode: true,
