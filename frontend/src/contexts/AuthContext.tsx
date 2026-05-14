@@ -314,6 +314,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       provider: "google",
       options: {
         redirectTo: redirectUrl,
+        queryParams: {
+          prompt: "select_account",
+        },
         scopes: "email profile",
       },
     });
