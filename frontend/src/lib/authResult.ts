@@ -4,6 +4,7 @@ export type AuthReason =
   | "user_already_registered"
   | "provider_not_enabled"
   | "signup_disabled"
+  | "invalid_api_key"
   | "unknown";
 
 export type AuthResult = {
@@ -54,6 +55,13 @@ export const mapAuthError = (message: string | null | undefined): Pick<AuthResul
     return {
       error: "Signups are currently disabled.",
       reason: "signup_disabled",
+    };
+  }
+
+  if (/invalid api key/i.test(message)) {
+    return {
+      error: "Supabase API key and URL do not match. Check your Supabase environment variables and restart the app.",
+      reason: "invalid_api_key",
     };
   }
 

@@ -18,6 +18,8 @@ const STALE_HOSTED_SUPABASE_PUBLIC_KEYS = new Set([
 
 const trimEnv = (value: string | undefined) => value?.trim() ?? "";
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
+const isKnownHostedPublicKey = (publicKey: string) =>
+  publicKey === CURRENT_SUPABASE_PUBLISHABLE_KEY || STALE_HOSTED_SUPABASE_PUBLIC_KEYS.has(publicKey);
 
 export const isLoopbackHostname = (value: string | null | undefined) =>
   value ? LOOPBACK_HOSTS.has(value) : false;
@@ -44,10 +46,12 @@ const resolveHostedProjectMigration = ({
   publicKey: string;
 }) => {
   const normalizedUrl = trimTrailingSlash(url);
-  const isHostedUrl = Boolean(normalizedUrl) && !isLoopbackUrl(normalizedUrl);
+  const isLoopback = isLoopbackUrl(normalizedUrl);
+  const isHostedUrl = Boolean(normalizedUrl) && !isLoopback;
   const shouldMigrate =
     STALE_HOSTED_SUPABASE_URLS.has(normalizedUrl) ||
-    (isHostedUrl && STALE_HOSTED_SUPABASE_PUBLIC_KEYS.has(publicKey));
+    (isHostedUrl && STALE_HOSTED_SUPABASE_PUBLIC_KEYS.has(publicKey)) ||
+    (isLoopback && isKnownHostedPublicKey(publicKey));
 
   if (!shouldMigrate) {
     return {
@@ -66,9 +70,11 @@ export const resolveSupabasePublicConfig = (env: SupabasePublicEnv) => {
   const url = trimTrailingSlash(trimEnv(env.NEXT_PUBLIC_SUPABASE_URL));
   const publishableKey = trimEnv(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
   const anonKey = trimEnv(env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const shouldPreferLocalAnonKey = isLoopbackUrl(url) && Boolean(anonKey) && isKnownHostedPublicKey(publishableKey);
+  const envPublicKey = shouldPreferLocalAnonKey ? anonKey : publishableKey || anonKey;
   const { url: resolvedUrl, publicKey } = resolveHostedProjectMigration({
     url,
-    publicKey: publishableKey || anonKey,
+    publicKey: envPublicKey,
   });
 
   return {
@@ -76,9 +82,11 @@ export const resolveSupabasePublicConfig = (env: SupabasePublicEnv) => {
     publicKey,
     hasConfig: Boolean(resolvedUrl && publicKey),
     isLoopback: isLoopbackUrl(resolvedUrl),
-    publicKeyEnvName: publishableKey
-      ? "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
-      : anonKey
+    publicKeyEnvName: shouldPreferLocalAnonKey
+      ? "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      : publishableKey
+        ? "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+        : anonKey
         ? "NEXT_PUBLIC_SUPABASE_ANON_KEY"
         : null,
   } as const;

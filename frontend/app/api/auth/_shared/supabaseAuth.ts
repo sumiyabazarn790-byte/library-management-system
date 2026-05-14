@@ -47,6 +47,12 @@ export const createSupabaseServerClients = () => {
   };
 };
 
+export const createSupabasePublicServerClient = () => {
+  const { publicKey } = getSupabasePublicConfig();
+
+  return createServerAuthClient(publicKey);
+};
+
 export const normalizeEmail = (value: unknown) =>
   typeof value === "string" ? value.trim().toLowerCase() : "";
 

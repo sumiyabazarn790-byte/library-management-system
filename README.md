@@ -40,6 +40,7 @@ The demo data includes:
 Notes:
 
 - Frontend env values live in `frontend/.env.local`.
+- If `frontend/.env.local` uses `http://127.0.0.1:54321`, copy the local keys from `supabase status --workdir backend -o env`; hosted `sb_publishable_*` or `sb_secret_*` keys do not work against the local API URL.
 - For Vercel deployments, also set `NEXT_PUBLIC_SUPABASE_URL` and a public Supabase key in Project Settings -> Environment Variables.
 - Preferred key name is `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; `NEXT_PUBLIC_SUPABASE_ANON_KEY` is still accepted as a legacy fallback.
 - To auto-grant admin access to selected accounts, set `ADMIN_EMAILS=email1@example.com,email2@example.com` in the frontend server environment.

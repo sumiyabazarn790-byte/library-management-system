@@ -14,4 +14,11 @@ describe("auth result mapping", () => {
       reason: "user_already_registered",
     });
   });
+
+  it("maps Supabase API key mismatch errors", () => {
+    expect(mapAuthError("Invalid API key")).toEqual({
+      error: "Supabase API key and URL do not match. Check your Supabase environment variables and restart the app.",
+      reason: "invalid_api_key",
+    });
+  });
 });

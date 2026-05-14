@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { mapAuthError, type AuthResult } from "@/lib/authResult";
 import {
+  createSupabasePublicServerClient,
   createSupabaseServerClients,
   normalizeDisplayName,
   normalizeEmail,
@@ -18,6 +19,45 @@ const SIGN_IN_RETRY_DELAYS_MS = [0, 250, 750, 1500];
 const wait = (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : "";
+
+const isAdminClientUnavailableError = (error: unknown) =>
+  /invalid api key|missing supabase_service_role_key|missing supabase_secret_key/i.test(getErrorMessage(error));
+
+const signUpWithPublicClient = async ({
+  email,
+  password,
+  displayName,
+}: {
+  email: string;
+  password: string;
+  displayName: string;
+}) => {
+  const authClient = createSupabasePublicServerClient();
+  const { data, error } = await authClient.auth.signUp({
+    email,
+    password,
+    options: displayName ? { data: { display_name: displayName } } : undefined,
+  });
+
+  if (error) {
+    return json(mapAuthError(error.message));
+  }
+
+  return json({
+    error: null,
+    reason: null,
+    emailConfirmationRequired: !data.session,
+    session: data.session
+      ? {
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        }
+      : null,
+  });
+};
+
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
@@ -29,7 +69,19 @@ export async function POST(request: Request) {
       return json({ error: "Email and password are required.", reason: "unknown" }, 400);
     }
 
-    const { authClient, adminClient } = createSupabaseServerClients();
+    let authClient: ReturnType<typeof createSupabasePublicServerClient>;
+    let adminClient: ReturnType<typeof createSupabaseServerClients>["adminClient"];
+
+    try {
+      ({ authClient, adminClient } = createSupabaseServerClients());
+    } catch (error) {
+      if (isAdminClientUnavailableError(error)) {
+        return signUpWithPublicClient({ email, password, displayName });
+      }
+
+      throw error;
+    }
+
     const { error } = await adminClient.auth.admin.createUser({
       email,
       password,
@@ -38,6 +90,10 @@ export async function POST(request: Request) {
     });
 
     if (error) {
+      if (isAdminClientUnavailableError(error)) {
+        return signUpWithPublicClient({ email, password, displayName });
+      }
+
       return json(mapAuthError(error.message));
     }
 

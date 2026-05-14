@@ -77,18 +77,49 @@ describe("resolveSupabasePublicConfig", () => {
     });
   });
 
-  it("keeps local loopback development config untouched even if the publishable key matches an old hosted project", () => {
+  it("repairs local loopback config when it is paired with a known hosted key", () => {
     expect(
       resolveSupabasePublicConfig({
         NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tDHilTgQswgrwopphkumAA_k--8ExEN",
       } as NodeJS.ProcessEnv),
     ).toEqual({
+      url: "https://origwdglnvvkilfuvrpa.supabase.co",
+      publicKey: "sb_publishable_3FHQqosmVQiCDT46oHC17A_B19S8Arl",
+      hasConfig: true,
+      isLoopback: false,
+      publicKeyEnvName: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    });
+  });
+
+  it("prefers the local anon key when loopback config also has a hosted publishable key", () => {
+    expect(
+      resolveSupabasePublicConfig({
+        NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tDHilTgQswgrwopphkumAA_k--8ExEN",
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "local-anon-jwt",
+      } as NodeJS.ProcessEnv),
+    ).toEqual({
       url: "http://127.0.0.1:54321",
-      publicKey: "sb_publishable_tDHilTgQswgrwopphkumAA_k--8ExEN",
+      publicKey: "local-anon-jwt",
       hasConfig: true,
       isLoopback: true,
-      publicKeyEnvName: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      publicKeyEnvName: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    });
+  });
+
+  it("keeps local loopback development config untouched with a local anon key", () => {
+    expect(
+      resolveSupabasePublicConfig({
+        NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "local-anon-jwt",
+      } as NodeJS.ProcessEnv),
+    ).toEqual({
+      url: "http://127.0.0.1:54321",
+      publicKey: "local-anon-jwt",
+      hasConfig: true,
+      isLoopback: true,
+      publicKeyEnvName: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     });
   });
 });
