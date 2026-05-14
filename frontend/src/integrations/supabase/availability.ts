@@ -8,6 +8,8 @@ import {
 
 const UNAVAILABLE_FLAG_KEY = "lumina.supabase.loopback.unavailable";
 export const SUPABASE_AVAILABILITY_CHANGE_EVENT = "lumina:supabase-availability-change";
+const SUPABASE_HEALTH_TIMEOUT_MS = 5000;
+const SUPABASE_HEALTH_RETRY_TIMEOUT_MS = 8000;
 
 export const LOCAL_SUPABASE_UNAVAILABLE_MESSAGE =
   "Local Supabase backend is not running. Start Docker Desktop, run `supabase start --workdir backend`, or update frontend/.env.local with your cloud project URL and publishable key.";
@@ -121,22 +123,9 @@ export const clearSupabaseUnavailableMarker = () => {
   dispatchAvailabilityChange(null);
 };
 
-export const primeSupabaseAvailability = async () => {
-  const configReason = getSupabaseConfigReason();
-
-  if (configReason) {
-    return {
-      available: false as const,
-      reason: configReason,
-    };
-  }
-
-  if (!hasWindow()) {
-    return { available: true as const, reason: null };
-  }
-
+const fetchSupabaseHealth = async (timeoutMs: number) => {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 1500);
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const healthUrl = new URL("/auth/v1/health", SUPABASE_URL).toString();
@@ -154,16 +143,44 @@ export const primeSupabaseAvailability = async () => {
       throw new Error(`Supabase auth health check failed with status ${response.status}`);
     }
 
+    return response;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
+export const primeSupabaseAvailability = async () => {
+  const configReason = getSupabaseConfigReason();
+
+  if (configReason) {
+    return {
+      available: false as const,
+      reason: configReason,
+    };
+  }
+
+  if (!hasWindow()) {
+    return { available: true as const, reason: null };
+  }
+
+  try {
+    await fetchSupabaseHealth(SUPABASE_HEALTH_TIMEOUT_MS);
     clearSupabaseUnavailableMarker();
     return { available: true as const, reason: null };
-  } catch {
+  } catch (firstError) {
+    try {
+      await fetchSupabaseHealth(SUPABASE_HEALTH_RETRY_TIMEOUT_MS);
+      clearSupabaseUnavailableMarker();
+      return { available: true as const, reason: null };
+    } catch {
+      console.warn("Supabase auth health check failed twice.", firstError);
+    }
+
     const reason = getDefaultSupabaseUnavailableMessage();
     markSupabaseUnavailable(reason);
     return {
       available: false as const,
       reason,
     };
-  } finally {
-    window.clearTimeout(timeoutId);
   }
 };
