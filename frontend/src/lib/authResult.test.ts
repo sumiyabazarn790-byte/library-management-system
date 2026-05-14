@@ -21,4 +21,11 @@ describe("auth result mapping", () => {
       reason: "invalid_api_key",
     });
   });
+
+  it("maps auth email rate limit errors", () => {
+    expect(mapAuthError("email rate limit exceeded")).toEqual({
+      error: "Too many auth emails were requested recently. Wait a bit and try again.",
+      reason: "rate_limited",
+    });
+  });
 });

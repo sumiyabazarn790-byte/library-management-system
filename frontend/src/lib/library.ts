@@ -89,9 +89,33 @@ const isRecoverableLibraryError = (error: unknown) => {
     recoverableLibraryErrorPatterns.some((pattern) => pattern.test(message));
 };
 
+const READER_PLACEHOLDER_PATTERNS = [
+  /^chapter\s+\d+/i,
+  /^entry\s+\d+/i,
+  /^part\s+\d+/i,
+  /^introduction$/i,
+  /^this is the opening chapter/i,
+  /^\d+-Ñ€ Ð±Ò¯Ð»ÑÐ³/i,
+];
+
+const hasSubstantiveReadingContent = (book: Pick<Book, "reading_content">) =>
+  Boolean(
+    book.reading_content?.some((section) => {
+      const trimmed = section.trim();
+      return trimmed.length >= 80 && !READER_PLACEHOLDER_PATTERNS.some((pattern) => pattern.test(trimmed));
+    }),
+  );
+
+const isReadableBook = (book: Pick<Book, "title" | "author" | "reading_content">) =>
+  hasSubstantiveReadingContent(book) || resolveHasPublicDomainSource(book);
+
+const filterReadableBooks = <T extends Pick<Book, "title" | "author" | "reading_content">>(books: T[]) =>
+  books.filter((book) => isReadableBook(book));
+
 const filterFallbackBooks = (query: string, limit: number, publicOnly = false) => {
   const normalized = query.trim().toLowerCase();
-  const source = publicOnly ? fallbackBooks.filter((book) => canReadBookNow(book)) : fallbackBooks;
+  const readableFallbackBooks = filterReadableBooks(fallbackBooks);
+  const source = publicOnly ? readableFallbackBooks : readableFallbackBooks;
 
   if (!normalized) {
     return source.slice(0, limit);
@@ -117,12 +141,13 @@ const filterFallbackBooksByGenres = (genres: string[], limit: number) => {
     return filterFallbackBooks("", limit);
   }
 
-  return fallbackBooks
+  return filterReadableBooks(fallbackBooks)
     .filter((book) => normalizedGenres.has(book.genre.trim().toLowerCase()))
     .slice(0, limit);
 };
 
-const findFallbackBookById = (bookId: string) => fallbackBooks.find((book) => book.id === bookId) ?? null;
+const findFallbackBookById = (bookId: string) =>
+  filterReadableBooks(fallbackBooks).find((book) => book.id === bookId) ?? null;
 
 const mergeBooks = (primary: Book[], secondary: Book[], limit: number) => {
   const seen = new Set<string>();
@@ -157,16 +182,17 @@ export const searchBooks = async (query: string, limit = 16): Promise<Book[]> =>
 
   if (!normalized) {
     try {
+      const queryLimit = Math.max(limit * 3, 24);
       const { data, error } = await supabase
         .from("books")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(limit);
+        .limit(queryLimit);
 
       if (error) throw error;
 
       const books = (data ?? []) as Book[];
-      return books;
+      return filterReadableBooks(books).slice(0, limit);
     } catch (error) {
       if (isRecoverableLibraryError(error)) {
         return filterFallbackBooks(normalized, limit);
@@ -182,7 +208,7 @@ export const searchBooks = async (query: string, limit = 16): Promise<Book[]> =>
     });
 
     if (!error && Array.isArray(data?.results)) {
-      return data.results as Book[];
+      return filterReadableBooks(data.results as Book[]).slice(0, limit);
     }
   } catch (error) {
     console.warn("search-books edge function unavailable, falling back to direct search", error);
@@ -197,7 +223,7 @@ export const searchBooks = async (query: string, limit = 16): Promise<Book[]> =>
     if (error) throw error;
 
     const books = (data ?? []) as Book[];
-    return books;
+    return filterReadableBooks(books).slice(0, limit);
   } catch (error) {
     if (isRecoverableLibraryError(error)) {
       return filterFallbackBooks(normalized, limit);
@@ -314,7 +340,8 @@ export const fetchBookById = async (bookId: string): Promise<Book | null> => {
 
     if (error) throw error;
 
-    return (data as Book | null) ?? null;
+    const book = (data as Book | null) ?? null;
+    return book && isReadableBook(book) ? book : null;
   } catch (error) {
     if (isRecoverableLibraryError(error)) {
       return fallbackBook;
@@ -456,7 +483,7 @@ export const fetchRecommendedBooks = async ({
     const { data, error } = await query;
     if (error) throw error;
 
-    const books = [...((data ?? []) as Book[])];
+    const books = filterReadableBooks([ ...((data ?? []) as Book[]) ]);
 
     if (books.length < Math.min(4, safeLimit)) {
       const { data: extra, error: extraError } = await supabase
@@ -467,7 +494,7 @@ export const fetchRecommendedBooks = async ({
 
       if (extraError) throw extraError;
 
-      const merged = mergeBooks(books, (extra ?? []) as Book[], safeLimit);
+      const merged = mergeBooks(books, filterReadableBooks((extra ?? []) as Book[]), safeLimit);
       return { books: merged, genres };
     }
 
@@ -647,25 +674,11 @@ export const formatLibraryMoney = (amount: number, currency: string) => {
 export const requiresBorrowPayment = (_book: Pick<Book, "borrow_price" | "is_public_readable">) =>
   false;
 
-const READER_PLACEHOLDER_PATTERNS = [
-  /^chapter\s+\d+/i,
-  /^entry\s+\d+/i,
-  /^part\s+\d+/i,
-  /^introduction$/i,
-  /^this is the opening chapter/i,
-  /^\d+-р бүлэг/i,
-];
-
 export const hasReadingContent = (book: Pick<Book, "reading_content">) =>
-  Boolean(
-    book.reading_content?.some((section) => {
-      const trimmed = section.trim();
-      return trimmed.length >= 80 && !READER_PLACEHOLDER_PATTERNS.some((pattern) => pattern.test(trimmed));
-    }),
-  );
+  hasSubstantiveReadingContent(book);
 
-export const canReadBookNow = (book: Pick<Book, "borrow_price" | "is_public_readable" | "reading_content">) =>
-  hasReadingContent(book);
+export const canReadBookNow = (book: Pick<Book, "title" | "author" | "reading_content">) =>
+  isReadableBook(book);
 
 export const buildReadingSections = (book: Book) => {
   if (book.reading_content?.length) {

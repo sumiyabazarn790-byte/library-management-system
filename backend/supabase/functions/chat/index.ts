@@ -68,6 +68,7 @@ Be warm, grounded, concise, and genuinely helpful.`;
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_OPENAI_CHAT_MODEL = "gpt-4.1-mini";
 const DEFAULT_OPENAI_QUERY_MODEL = "gpt-4.1-mini";
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
 
 const STALE_AUTH_SESSION_PATTERN =
   /user from sub claim in jwt does not exist|session from session_id claim in jwt does not exist|invalid refresh token|refresh token not found|loans_user_id_fkey|violates foreign key constraint ["']loans_user_id_fkey["']/i;
@@ -169,6 +170,20 @@ const getEnv = (name: string) => {
 };
 
 const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, "");
+
+const isGoogleOpenAiCompatibleBaseUrl = (value: string | null | undefined) =>
+  /generativelanguage\.googleapis\.com\/v1beta\/openai/i.test(value ?? "");
+
+const getDefaultAiModels = (baseUrl: string) =>
+  isGoogleOpenAiCompatibleBaseUrl(baseUrl)
+    ? {
+        chatModel: DEFAULT_GEMINI_MODEL,
+        queryModel: DEFAULT_GEMINI_MODEL,
+      }
+    : {
+        chatModel: DEFAULT_OPENAI_CHAT_MODEL,
+        queryModel: DEFAULT_OPENAI_QUERY_MODEL,
+      };
 
 const canonicalizeIntentWord = (word: string) => {
   const collapsed = word.replace(/([a-z])\1{2,}/g, "$1$1");
@@ -418,8 +433,8 @@ const buildSignInReply = (language: AssistantLanguage) =>
 
 const buildBackendUnavailableReply = (language: AssistantLanguage) =>
   language === "mn"
-    ? "AI library backend одоогоор бүрэн холбогдохгүй байна. Түр хүлээгээд дахин оролдоно уу."
-    : "The AI library backend is not fully available right now. Please try again shortly.";
+    ? "AI key тааруулагдаагүй байна. `backend/.env` болон шаардлагатай бол `frontend/.env.local` дотор `OPENAI_API_KEY` оруулаад, Supabase edge secrets-ээ дахин ачаална уу."
+    : "The AI key is not configured yet. Add `OPENAI_API_KEY` in `backend/.env` (and `frontend/.env.local` if needed), then reload the Supabase edge secrets.";
 
 const formatBookLine = (book: CatalogBook, language: AssistantLanguage) =>
   `• ${book.title} — ${book.author} (${book.genre}, ${book.available_copies}/${book.total_copies} ${
@@ -1033,8 +1048,9 @@ Deno.serve(async (req) => {
     const lovableApiKey = getEnv("LOVABLE_API_KEY");
     const openAiApiKey = getEnv("OPENAI_API_KEY");
     const openAiBaseUrl = getEnv("OPENAI_BASE_URL") ?? DEFAULT_OPENAI_BASE_URL;
-    const openAiChatModel = getEnv("OPENAI_CHAT_MODEL") ?? DEFAULT_OPENAI_CHAT_MODEL;
-    const openAiQueryModel = getEnv("OPENAI_QUERY_MODEL") ?? getEnv("OPENAI_CHAT_MODEL") ?? DEFAULT_OPENAI_QUERY_MODEL;
+    const defaultAiModels = getDefaultAiModels(openAiBaseUrl);
+    const openAiChatModel = getEnv("OPENAI_CHAT_MODEL") ?? defaultAiModels.chatModel;
+    const openAiQueryModel = getEnv("OPENAI_QUERY_MODEL") ?? getEnv("OPENAI_CHAT_MODEL") ?? defaultAiModels.queryModel;
     const { serviceClient, userClient } = getSupabaseClients(req);
     const user = await getAuthenticatedUser(userClient);
     const { messages } = await req.json() as { messages: ChatMessage[] };

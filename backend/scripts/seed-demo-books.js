@@ -63,6 +63,46 @@ if (!SERVICE_ROLE_KEY) {
 console.log(`📍 Supabase URL: ${SUPABASE_URL}`);
 console.log(`🔑 Түлхүүр: ${SUPABASE_KEY.substring(0, 10)}... (Төрөл: ${SERVICE_ROLE_KEY ? 'Service Role' : 'Anon'})\n`);
 
+const READER_PLACEHOLDER_PATTERNS = [
+  /^chapter\s+\d+/i,
+  /^entry\s+\d+/i,
+  /^part\s+\d+/i,
+  /^introduction$/i,
+  /^this is the opening chapter/i,
+  /^\d+[-.)\s]/,
+];
+
+const FREE_READER_BOOK_KEYS = new Set([
+  "jane austen::pride and prejudice",
+  "mary shelley::frankenstein",
+  "frances hodgson burnett::the secret garden",
+  "arthur conan doyle::the adventures of sherlock holmes",
+  "l. frank baum::the wonderful wizard of oz",
+  "frances hodgson burnett::a little princess",
+  "charlotte bronte::jane eyre",
+  "herman melville::moby-dick",
+  "h. g. wells::the time machine",
+  "h. g. wells::the war of the worlds",
+  "lewis carroll::alice's adventures in wonderland",
+  "robert louis stevenson::treasure island",
+  "oscar wilde::the picture of dorian gray",
+  "plato::the republic",
+  "niccolo machiavelli::the prince",
+  "walt whitman::leaves of grass",
+  "rudyard kipling::the jungle book",
+  "bram stoker::dracula",
+  "unknown::монголын нууц товчоо",
+]);
+
+const toBookKey = (book) => `${(book.author || "").trim().toLowerCase()}::${(book.title || "").trim().toLowerCase()}`;
+
+const hasSubstantiveReadingContent = (book) =>
+  Array.isArray(book.reading_content) &&
+  book.reading_content.some((section) => {
+    const trimmed = section.trim();
+    return trimmed.length >= 80 && !READER_PLACEHOLDER_PATTERNS.some((pattern) => pattern.test(trimmed));
+  });
+
 const DEMO_BOOKS = [
   { title: "The Midnight Library", author: "Matt Haig", genre: "Fiction", language: "en", description: "A dazzling novel about all the choices that go into a life well lived.", total_copies: 5, available_copies: 5, is_public_readable: false },
   { title: "Project Hail Mary", author: "Andy Weir", genre: "Science Fiction", language: "en", description: "A lone astronaut must save Earth from extinction.", total_copies: 6, available_copies: 6, is_public_readable: false },
@@ -98,14 +138,27 @@ const DEMO_BOOKS = [
   { title: "Зүрхний хилэн", author: "Б. Ринчен", genre: "Historical Fiction", language: "mn", description: "Монголчуудын эрх чөлөө, тусгаар тогтнолын төлөөх тэмцлийг харуулсан бүтээл.", total_copies: 3, available_copies: 3, is_public_readable: false },
   { title: "Монголын нууц товчоо", author: "Unknown", genre: "History", language: "mn", description: "Монголын эртний түүх, соёлын гайхамшигт дурсгал.", total_copies: 10, available_copies: 10, is_public_readable: true, reading_content: ["1-р бүлэг: Чингис хааны язгуур", "2-р бүлэг: Тэмүжиний хүүхэд нас"] },
 ].map((book) => {
-  const hasReaderText = Array.isArray(book.reading_content) && book.reading_content.length > 0;
+  const normalizedBook =
+    book.author === "Unknown" && book.language === "mn" && book.genre === "History"
+      ? {
+          ...book,
+          reading_content: [
+            "Монголын нууц товчоо нь Temuujin хэрхэн овог аймгийн задрал, урвалт, эвслийн дундуур өөрийн байр суурийг бэхжүүлж, хүмүүсийн үнэнч байдал ба эрх мэдлийн үнээр төр улсыг байгуулсан тухай өргөн хүрээтэй өгүүлдэг. Нэг хүний замналын цаана бүхэл бүтэн нүүдэлчдийн ертөнцийн ёс заншил, ахуй, улс төрийн хэлбэр амьсгалж байдаг.",
+            "Энэ шастирын хүч нь зөвхөн түүхэн мэдээлэлдээ биш, харин дуу хоолойндоо байдаг. Эцэг өвгөдийн нэр, андгай тангараг, гашуудал, ялалт, цээрлэл бүгд аман уламжлалын хэмнэлтэйгээр урагшилж, уншигчид XIII зууны Монголын сэтгэлгээний ойролцоо очих боломж өгдөг. Тиймээс уг бүтээл бол архивын баримт төдий бус, соёлын ой санамжийн хэлбэр юм.",
+            "Тэмүүжиний өсөлттэй хамт нөхөрлөл ба урвалт хоёр байнга зэрэгцэн гарч ирдэг. Хүний зан чанар, овгийн ашиг сонирхол, дайны шаардлага гурав мөргөлдөх үед ямар шийдвэр гарч байсныг текст маш тод харуулдаг. Энэ нь Чингис хааны дүрийг домог болгож хэт энгийнчлэхгүй, харин түүхийн дотоод зөрчилтэй орчинд тавьж ойлгуулахад тусалдаг.",
+            "Өнөөдөр Монголын нууц товчоог уншихад зөвхөн эх сурвалжийн үнэ цэнэ биш, үндэстний өөрийгөө ойлгох хэлбэр ч мэдрэгддэг. Хэл найруулга, үйл явдлын дараалал, хүний холбоо харилцааны зураглал нь төр, гэр бүл, анд нөхөр, дайсны тухай ойлголтууд хэрхэн бүтээгдэж ирснийг харуулж, орчин үеийн уншигчидтай ч холбогдох асуултуудыг нээж өгдөг.",
+          ],
+        }
+      : book;
+  const hasReaderText = hasSubstantiveReadingContent(normalizedBook);
+  const isFreeReaderBook = FREE_READER_BOOK_KEYS.has(toBookKey(normalizedBook));
   return {
     borrow_price: 0,
     borrow_currency: "MNT",
-    ...book,
-    is_public_readable: book.is_public_readable || hasReaderText,
+    ...normalizedBook,
+    is_public_readable: normalizedBook.is_public_readable || hasReaderText || isFreeReaderBook,
   };
-});
+}).filter((book) => hasSubstantiveReadingContent(book) || FREE_READER_BOOK_KEYS.has(toBookKey(book)));
 
 async function seedBooks() {
   console.log("🌱 Starting demo book data seed...\n");

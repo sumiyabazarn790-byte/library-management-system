@@ -3,6 +3,7 @@ import { mapAuthError, type AuthResult } from "@/lib/authResult";
 import {
   createSupabasePublicServerClient,
   createSupabaseServerClients,
+  isLoopbackSupabaseServerConfig,
   normalizeDisplayName,
   normalizeEmail,
   normalizePassword,
@@ -24,6 +25,22 @@ const getErrorMessage = (error: unknown) =>
 
 const isAdminClientUnavailableError = (error: unknown) =>
   /invalid api key|missing supabase_service_role_key|missing supabase_secret_key/i.test(getErrorMessage(error));
+
+const getLocalAdminSignupError = (error: unknown) => {
+  if (!isAdminClientUnavailableError(error)) {
+    return null;
+  }
+
+  try {
+    if (!isLoopbackSupabaseServerConfig()) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+
+  return "Local signup needs a working Supabase admin key. Add SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY) to frontend/.env.local. If you changed backend/supabase/config.toml, restart local Supabase and try again.";
+};
 
 const signUpWithPublicClient = async ({
   email,
@@ -75,6 +92,12 @@ export async function POST(request: Request) {
     try {
       ({ authClient, adminClient } = createSupabaseServerClients());
     } catch (error) {
+      const localAdminSignupError = getLocalAdminSignupError(error);
+
+      if (localAdminSignupError) {
+        return json({ error: localAdminSignupError, reason: "unknown" }, 500);
+      }
+
       if (isAdminClientUnavailableError(error)) {
         return signUpWithPublicClient({ email, password, displayName });
       }
@@ -90,6 +113,12 @@ export async function POST(request: Request) {
     });
 
     if (error) {
+      const localAdminSignupError = getLocalAdminSignupError(error);
+
+      if (localAdminSignupError) {
+        return json({ error: localAdminSignupError, reason: "unknown" }, 500);
+      }
+
       if (isAdminClientUnavailableError(error)) {
         return signUpWithPublicClient({ email, password, displayName });
       }

@@ -29,6 +29,7 @@ const MAX_SECTIONS = 180;
 const TEXT_FETCH_TIMEOUT_MS = 3500;
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_OPENAI_TRANSLATE_MODEL = "gpt-4.1-mini";
+const DEFAULT_GEMINI_TRANSLATE_MODEL = "gemini-2.5-flash-lite";
 const MAX_TRANSLATION_BATCH_SECTIONS = 12;
 const MAX_TRANSLATION_BATCH_CHARS = 7200;
 const OPENAI_TRANSLATION_BATCH_CONCURRENCY = 2;
@@ -80,6 +81,12 @@ const normalizeText = (value: string) =>
     .trim();
 
 const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, "");
+
+const isGoogleOpenAiCompatibleBaseUrl = (value: string | null | undefined) =>
+  /generativelanguage\.googleapis\.com\/v1beta\/openai/i.test(value ?? "");
+
+const getDefaultTranslateModel = (baseUrl: string) =>
+  isGoogleOpenAiCompatibleBaseUrl(baseUrl) ? DEFAULT_GEMINI_TRANSLATE_MODEL : DEFAULT_OPENAI_TRANSLATE_MODEL;
 
 const mergeMessages = (...messages: Array<string | undefined>) =>
   messages
@@ -344,7 +351,7 @@ const translateSectionBatch = async (sections: string[], sourceBook: SourceBook)
     getPrivateEnv("OPENAI_READER_TRANSLATE_MODEL") ||
     getPrivateEnv("OPENAI_QUERY_MODEL") ||
     getPrivateEnv("OPENAI_CHAT_MODEL") ||
-    DEFAULT_OPENAI_TRANSLATE_MODEL;
+    getDefaultTranslateModel(openAiBaseUrl);
 
   const response = await fetch(`${openAiBaseUrl}/chat/completions`, {
     method: "POST",

@@ -30,6 +30,7 @@ const MIN_QUERY_TERM_LENGTH = 2;
 const DEFAULT_CATALOG_SCAN_LIMIT = 250;
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_OPENAI_QUERY_MODEL = "gpt-4.1-mini";
+const DEFAULT_GEMINI_QUERY_MODEL = "gemini-2.5-flash-lite";
 
 const normalizeSearchText = (value: string) =>
   value
@@ -79,6 +80,12 @@ const dedupeBooks = (books: CatalogBook[]) => {
 };
 
 const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, "");
+
+const isGoogleOpenAiCompatibleBaseUrl = (value: string | null | undefined) =>
+  /generativelanguage\.googleapis\.com\/v1beta\/openai/i.test(value ?? "");
+
+const getDefaultQueryModel = (baseUrl: string | null | undefined) =>
+  isGoogleOpenAiCompatibleBaseUrl(baseUrl) ? DEFAULT_GEMINI_QUERY_MODEL : DEFAULT_OPENAI_QUERY_MODEL;
 
 const parseJsonObject = (value: string) => {
   const trimmed = value.trim();
@@ -167,14 +174,15 @@ export const expandCatalogQuery = async (
 
   try {
     if (openAiApiKey) {
-      const response = await fetch(`${normalizeBaseUrl(openAiBaseUrl || DEFAULT_OPENAI_BASE_URL)}/chat/completions`, {
+      const normalizedBaseUrl = normalizeBaseUrl(openAiBaseUrl || DEFAULT_OPENAI_BASE_URL);
+      const response = await fetch(`${normalizedBaseUrl}/chat/completions`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${openAiApiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: openAiQueryModel || DEFAULT_OPENAI_QUERY_MODEL,
+          model: openAiQueryModel || getDefaultQueryModel(normalizedBaseUrl),
           messages: [
             {
               role: "system",

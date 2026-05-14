@@ -26,7 +26,7 @@ vi.mock("@/integrations/supabase/availability", () => ({
   isLoopbackSupabaseUrl: false,
 }));
 
-import { canReadBookNow, fetchPublicReadableBooks, searchBooks } from "./library";
+import { canReadBookNow, fetchBookById, fetchPublicReadableBooks, searchBooks } from "./library";
 
 describe("library fallbacks", () => {
   beforeEach(() => {
@@ -49,7 +49,9 @@ describe("library fallbacks", () => {
       })),
     });
 
-    await expect(searchBooks("", 5)).resolves.toEqual(fallbackBooks.slice(0, 5));
+    await expect(searchBooks("", 5)).resolves.toEqual(
+      fallbackBooks.filter((book) => canReadBookNow(book)).slice(0, 5),
+    );
   });
 
   it("falls back to built-in search results when the fuzzy search function is out of date", async () => {
@@ -92,5 +94,73 @@ describe("library fallbacks", () => {
 
     const expected = fallbackBooks.filter((book) => canReadBookNow(book)).slice(0, 3);
     await expect(fetchPublicReadableBooks(3)).resolves.toEqual(expected);
+  });
+
+  it("filters unreadable rows out of direct catalog results", async () => {
+    supabaseMocks.from.mockReturnValue({
+      select: vi.fn(() => ({
+        order: vi.fn(() => ({
+          limit: vi.fn(async () => ({
+            data: [
+              {
+                id: "book-1",
+                title: "Pride and Prejudice",
+                author: "Jane Austen",
+                genre: "Classics",
+                description: "Readable public-domain title.",
+                language: "en",
+                total_copies: 12,
+                available_copies: 12,
+                reading_content: ["Short preview only"],
+              },
+              {
+                id: "book-2",
+                title: "The Midnight Library",
+                author: "Matt Haig",
+                genre: "Fiction",
+                description: "Unreadable in-site preview.",
+                language: "en",
+                total_copies: 5,
+                available_copies: 5,
+                reading_content: null,
+              },
+            ],
+            error: null,
+          })),
+        })),
+      })),
+    });
+
+    await expect(searchBooks("", 5)).resolves.toEqual([
+      expect.objectContaining({
+        title: "Pride and Prejudice",
+        author: "Jane Austen",
+      }),
+    ]);
+  });
+
+  it("hides unreadable books when fetched directly by id", async () => {
+    supabaseMocks.from.mockReturnValue({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn(async () => ({
+            data: {
+              id: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+              title: "The Midnight Library",
+              author: "Matt Haig",
+              genre: "Fiction",
+              description: "Unreadable in-site preview.",
+              language: "en",
+              total_copies: 5,
+              available_copies: 5,
+              reading_content: null,
+            },
+            error: null,
+          })),
+        })),
+      })),
+    });
+
+    await expect(fetchBookById("3fa85f64-5717-4562-b3fc-2c963f66afa6")).resolves.toBeNull();
   });
 });

@@ -51,12 +51,18 @@ OPENAI_QUERY_MODEL=gpt-4.1-mini
 OPENAI_BASE_URL=
 ```
 
-Gemini API keys can be used through Google's OpenAI-compatible endpoint:
+For the fastest low-cost setup in this repo, Gemini API keys can be used through Google's OpenAI-compatible endpoint:
 
 ```powershell
 OPENAI_API_KEY=<your-gemini-api-key>
 OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-OPENAI_CHAT_MODEL=gemini-2.5-flash
-OPENAI_QUERY_MODEL=gemini-2.5-flash
-OPENAI_READER_TRANSLATE_MODEL=gemini-2.5-flash
+OPENAI_CHAT_MODEL=gemini-2.5-flash-lite
+OPENAI_QUERY_MODEL=gemini-2.5-flash-lite
+OPENAI_READER_TRANSLATE_MODEL=gemini-2.5-flash-lite
+```
+
+Once `backend/.env` is updated, reload the edge function secrets:
+
+```powershell
+supabase secrets set --env-file backend/.env --workdir backend
 ```

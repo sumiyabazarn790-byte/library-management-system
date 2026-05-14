@@ -1,20 +1,111 @@
 import "server-only";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
 import { createClient, type User } from "@supabase/supabase-js";
 import { resolveSupabasePublicConfig } from "@/integrations/supabase/config";
 
-const getEnv = (name: string) => process.env[name]?.trim() || "";
+type LocalEnvCache = {
+  path: string | null;
+  mtimeMs: number;
+  values: Record<string, string>;
+};
 
-const getSupabasePublicConfig = () => {
-  const { url, publicKey } = resolveSupabasePublicConfig({
+const LOCAL_ENV_FILE_CANDIDATES = [".env.local", path.join("frontend", ".env.local")];
+const ENV_ASSIGNMENT_PATTERN = /^([\w.-]+)\s*=\s*(.*)$/;
+
+let localEnvCache: LocalEnvCache | null = null;
+
+const stripWrappingQuotes = (value: string) => {
+  const trimmed = value.trim();
+
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+
+  return trimmed;
+};
+
+const parseDotenv = (contents: string) => {
+  const values: Record<string, string> = {};
+
+  for (const line of contents.split(/\r?\n/)) {
+    const trimmed = line.trim();
+
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+
+    const match = trimmed.match(ENV_ASSIGNMENT_PATTERN);
+
+    if (!match) {
+      continue;
+    }
+
+    values[match[1]] = stripWrappingQuotes(match[2]);
+  }
+
+  return values;
+};
+
+const loadLocalEnvOverrides = () => {
+  for (const relativePath of LOCAL_ENV_FILE_CANDIDATES) {
+    const absolutePath = path.resolve(process.cwd(), relativePath);
+
+    try {
+      if (!existsSync(absolutePath)) {
+        continue;
+      }
+
+      const { mtimeMs } = statSync(absolutePath);
+
+      if (localEnvCache?.path === absolutePath && localEnvCache.mtimeMs === mtimeMs) {
+        return localEnvCache.values;
+      }
+
+      const values = parseDotenv(readFileSync(absolutePath, "utf8"));
+      localEnvCache = {
+        path: absolutePath,
+        mtimeMs,
+        values,
+      };
+
+      return values;
+    } catch {
+      continue;
+    }
+  }
+
+  localEnvCache = {
+    path: null,
+    mtimeMs: 0,
+    values: {},
+  };
+
+  return localEnvCache.values;
+};
+
+const getEnv = (name: string) =>
+  loadLocalEnvOverrides()[name]?.trim() || process.env[name]?.trim() || "";
+
+const getResolvedSupabasePublicConfig = () => {
+  const config = resolveSupabasePublicConfig({
     NEXT_PUBLIC_SUPABASE_URL: getEnv("NEXT_PUBLIC_SUPABASE_URL"),
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: getEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
     NEXT_PUBLIC_SUPABASE_ANON_KEY: getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
   });
 
-  if (!url || !publicKey) {
+  if (!config.url || !config.publicKey) {
     throw new Error("Missing Supabase public configuration.");
   }
 
+  return config;
+};
+
+const getSupabasePublicConfig = () => {
+  const { url, publicKey } = getResolvedSupabasePublicConfig();
   return { url, publicKey };
 };
 
@@ -52,6 +143,9 @@ export const createSupabasePublicServerClient = () => {
 
   return createServerAuthClient(publicKey);
 };
+
+export const isLoopbackSupabaseServerConfig = () =>
+  getResolvedSupabasePublicConfig().isLoopback;
 
 export const normalizeEmail = (value: unknown) =>
   typeof value === "string" ? value.trim().toLowerCase() : "";

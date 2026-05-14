@@ -3,6 +3,7 @@ export type AuthReason =
   | "email_not_confirmed"
   | "user_already_registered"
   | "provider_not_enabled"
+  | "rate_limited"
   | "signup_disabled"
   | "invalid_api_key"
   | "unknown";
@@ -49,6 +50,17 @@ export const mapAuthError = (message: string | null | undefined): Pick<AuthResul
     return {
       error: "Google login is not enabled in your Supabase project.",
       reason: "provider_not_enabled",
+    };
+  }
+
+  if (
+    /email rate limit exceeded|over_email_send_rate_limit|for security purposes, you can only request this after/i.test(
+      message,
+    )
+  ) {
+    return {
+      error: "Too many auth emails were requested recently. Wait a bit and try again.",
+      reason: "rate_limited",
     };
   }
 
