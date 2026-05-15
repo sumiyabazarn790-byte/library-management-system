@@ -112,8 +112,8 @@ export const FreeReadingShelf = ({
           </h2>
           <p className="mt-1.5 text-sm text-muted-foreground">
             {user
-              ? "Open public-domain books on site, sorted by genre, with Mongolian translation in the reader."
-              : "Sign in first to read public-domain books on site with Mongolian translation."}
+              ? "Borrow public-domain books first, then read them on site with Mongolian translation."
+              : "Sign in first to borrow public-domain books and read them on site."}
           </p>
         </div>
         {!loading && books.length ? (

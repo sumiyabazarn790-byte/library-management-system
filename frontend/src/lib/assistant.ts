@@ -739,7 +739,7 @@ const withAgentState = (
 
 const buildBookAccessHint = (book: Book, language: AssistantLanguage) => {
   if (canReadBookNow(book)) {
-    return language === "mn" ? "\u0448\u0443\u0443\u0434 \u0443\u043d\u0448\u0438\u0436 \u0431\u043e\u043b\u043d\u043e" : "read now";
+    return language === "mn" ? "\u044d\u0445\u043b\u044d\u044d\u0434 \u0437\u044d\u044d\u043b\u044d\u044d\u0434 \u0443\u043d\u0448\u0438\u043d\u0430" : "borrow to read";
   }
 
   if (book.available_copies > 0) {
@@ -860,8 +860,8 @@ const buildReadableBooksReply = async (language: AssistantLanguage): Promise<Loc
       handled: true,
       reply:
         language === "mn"
-          ? "\u041e\u0434\u043e\u043e\u0433\u043e\u043e\u0440 \u0448\u0443\u0443\u0434 \u0443\u043d\u0448\u0438\u0436 \u0431\u043e\u043b\u043e\u0445 \u043d\u043e\u043c \u043e\u043b\u0434\u0441\u043e\u043d\u0433\u04af\u0439."
-          : "I could not find any on-site reader titles right now.",
+          ? "\u041e\u0434\u043e\u043e\u0433\u043e\u043e\u0440 \u044d\u0445\u043b\u044d\u044d\u0434 \u0437\u044d\u044d\u043b\u044d\u044d\u0434 \u0443\u043d\u0448\u0438\u0445 \u043d\u043e\u043c \u043e\u043b\u0434\u0441\u043e\u043d\u0433\u04af\u0439."
+          : "I could not find any borrow-to-read titles right now.",
     }, {
       mode: "local",
       intent: "readable",
@@ -875,12 +875,12 @@ const buildReadableBooksReply = async (language: AssistantLanguage): Promise<Loc
     handled: true,
     reply: [
       language === "mn"
-        ? "\u0428\u0443\u0443\u0434 \u0443\u043d\u0448\u0438\u0436 \u0431\u043e\u043b\u043e\u0445 \u043d\u043e\u043c\u0443\u0443\u0434:"
-        : "These titles can be opened and read right away:",
+        ? "\u042d\u0445\u043b\u044d\u044d\u0434 \u0437\u044d\u044d\u043b\u044d\u044d\u0434 \u0443\u043d\u0448\u0438\u0445 \u043d\u043e\u043c\u0443\u0443\u0434:"
+        : "These public reader titles can be borrowed first, then read:",
       ...books.map((book) => formatBookLine(book, language)),
       language === "mn"
-        ? "Catalog card-\u0430\u0430\u0441 \u043d\u044c reader-\u0438\u0439\u0433 \u0448\u0443\u0443\u0434 \u043d\u044d\u044d\u0436 \u0431\u043e\u043b\u043d\u043e."
-        : "You can open any of them directly from the catalog reader button.",
+        ? "Catalog card-\u0430\u0430\u0441 \u043d\u044c \u044d\u0445\u043b\u044d\u044d\u0434 \u0437\u044d\u044d\u043b\u044d\u044d\u0434, \u0434\u0430\u0440\u0430\u0430 \u043d\u044c Library-\u0430\u0430\u0441 reader-\u0438\u0439\u0433 \u043d\u044d\u044d\u043d\u044d."
+        : "Borrow one from its catalog card first, then open the reader from Library.",
     ].join("\n"),
   }, {
     mode: "local",
@@ -1016,16 +1016,6 @@ const buildBorrowOrRequestReply = async ({
           language === "mn"
             ? `"${query}" нэртэй ном каталогоос олдсонгүй.`
             : `I could not find "${query}" in the catalog.`,
-      };
-    }
-
-    if (canReadBookNow(book)) {
-      return {
-        handled: true,
-        reply:
-          language === "mn"
-            ? `"${book.title}" нь site дээр шууд уншигддаг ном байна. Card дээрээс нь "Read on site" гэж нээж болно.`
-            : `"${book.title}" is already available to read on site. You can open it directly from the catalog card.`,
       };
     }
 

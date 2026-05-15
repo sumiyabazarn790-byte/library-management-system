@@ -18,7 +18,6 @@ import { getBookCover } from "@/lib/bookCovers";
 import {
   buildReadingSections,
   canReadBookNow,
-  fetchBookById,
   fetchBorrowedBookById,
   getPublicDomainReaderUrl,
   getPublicDomainTextApiPath,
@@ -228,13 +227,12 @@ const Reader = () => {
       setErrorMessage("");
 
       try {
-        const publicBook = await fetchBookById(bookId);
-        const nextBook = publicBook ?? (await fetchBorrowedBookById(user.id, bookId));
+        const nextBook = await fetchBorrowedBookById(user.id, bookId);
 
         if (!canceled) {
           if (!nextBook) {
             setBook(null);
-            setErrorMessage("This reader title could not be found.");
+            setErrorMessage("Borrow this title first, then open it from your Library to read.");
           } else {
             setBook(nextBook);
           }

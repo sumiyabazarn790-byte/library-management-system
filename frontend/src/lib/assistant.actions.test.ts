@@ -224,6 +224,29 @@ describe("assistant action handling", () => {
     expect(reply.reply).toContain("Atomic Habits");
   });
 
+  it("borrows readable public books before opening reader access", async () => {
+    const book = baseBook({
+      id: "book-readable",
+      title: "Leaves of Grass",
+      author: "Walt Whitman",
+      is_public_readable: true,
+      reading_content: ["A long readable public-domain section for the in-site reader."],
+    });
+    libraryMocks.canReadBookNow.mockReturnValue(true);
+    libraryMocks.searchBooks.mockResolvedValue([book]);
+    libraryMocks.resolveBookId.mockResolvedValue("book-readable");
+
+    const reply = await assistant.resolveLocalAssistantReply({
+      text: "borrow leaves of grass",
+      userId: "user-1",
+      history: [],
+    });
+
+    expect(reply.handled).toBe(true);
+    expect(supabaseMocks.rpc).toHaveBeenCalledWith("borrow_book", { p_book_id: "book-readable" });
+    expect(reply.reply).toContain("Leaves of Grass");
+  });
+
   it("borrows a referenced follow-up option from the previous assistant list", async () => {
     const firstBook = baseBook({
       id: "book-10",

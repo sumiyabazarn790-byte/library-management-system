@@ -1,10 +1,9 @@
 import { BookMarked, BookOpen, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import type { Book, LoanStatus } from "@/types/library";
 import { useAuth } from "@/contexts/AuthContext";
-import { buildSignInPath } from "@/lib/auth";
 import { getBookCover } from "@/lib/bookCovers";
 import {
   canReadBookNow,
@@ -16,7 +15,6 @@ import {
   toFriendlyLibraryError,
 } from "@/lib/library";
 import { supabase } from "@/integrations/supabase/client";
-import { BookReaderDialog } from "./BookReaderDialog";
 import { BookPreviewDialog } from "./BookPreviewDialog";
 
 type BookCardProps = {
@@ -39,9 +37,16 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
   const isActive = loanStatus === "active";
   const isRequested = loanStatus === "requested";
   const readerPath = getBookReaderPath(book);
+  const canBorrowFromCard = hasCanonicalBookId || canReadFree;
 
   const primaryLabel = useMemo(() => {
-    if (canReadFree) return user ? "Read on site" : "Sign in to read";
+    if (canReadFree) {
+      if (!user) return "Sign in to borrow";
+      if (isActive) return "Read";
+      if (isRequested) return "Requested";
+      return book.available_copies > 0 ? "Borrow to read" : "Request";
+    }
+
     if (!hasCanonicalBookId) return "Preview only";
     if (isActive) return "Read";
     if (isRequested) return "Requested";
@@ -51,17 +56,17 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
   const completeBorrowFlow = async (borrowMode: "borrow" | "request") => {
     if (!user) {
       navigate("/auth");
-      return false;
+      return null;
     }
 
-    if (!hasCanonicalBookId) {
+    if (!canBorrowFromCard) {
       toast.message("Ene preview nom local catalog-d l baina. Database-d burtgeltei huvilbar deer borrow hiih bolno.");
-      return false;
+      return null;
     }
 
     if (isActive || isRequested) {
       onChanged?.();
-      return false;
+      return null;
     }
 
     setBusy(true);
@@ -79,15 +84,21 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
           await signOut();
           toast.error("Your local session expired. Please sign in again before borrowing.");
           navigate("/auth");
-          return false;
+          return null;
         }
 
-        if (/already borrowed|already requested/i.test(error.message)) {
+        if (/already borrowed/i.test(error.message)) {
           onChanged?.();
+          return canonicalBookId;
+        }
+
+        if (/already requested/i.test(error.message)) {
+          onChanged?.();
+          return null;
         }
 
         toast.error(toFriendlyLibraryError(error.message));
-        return false;
+        return null;
       }
 
       toast.success(
@@ -96,7 +107,7 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
           : `"${book.title}" request submitted. It will activate when available.`,
       );
       onChanged?.();
-      return true;
+      return canonicalBookId;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Borrow request failed";
 
@@ -104,11 +115,11 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
         await signOut();
         toast.error("Your local session expired. Please sign in again before borrowing.");
         navigate("/auth");
-        return false;
+        return null;
       }
 
       toast.error(toFriendlyLibraryError(message));
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }
@@ -121,11 +132,11 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
     }
 
     const nextBorrowMode = book.available_copies > 0 ? "borrow" : "request";
-    await completeBorrowFlow(nextBorrowMode);
-  };
+    const canonicalBookId = await completeBorrowFlow(nextBorrowMode);
 
-  const handleReaderSignIn = () => {
-    navigate(buildSignInPath(readerPath));
+    if (canonicalBookId && nextBorrowMode === "borrow") {
+      navigate(getBookReaderPath({ id: canonicalBookId }));
+    }
   };
 
   const handleSaveToggle = async () => {
@@ -172,7 +183,7 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
       type="button"
       onClick={options?.onClick}
       className="flex flex-1 flex-col text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-      aria-label={options?.ariaLabel ?? (canReadFree ? `${book.title} open reader` : `${book.title} open preview`)}
+      aria-label={options?.ariaLabel ?? `${book.title} open preview`}
     >
       <div className="relative aspect-[3/4] overflow-hidden">
         <img
@@ -194,7 +205,7 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
           </span>
           {canReadFree ? (
             <span className="rounded-full bg-secondary-deep/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-secondary sm:px-2.5 sm:text-label">
-              Free read
+              Free borrow
             </span>
           ) : null}
         </div>
@@ -225,7 +236,7 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
             </span>
           </div>
           <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/80 sm:text-[11px] sm:tracking-[0.18em]">
-            {canReadFree ? (user ? "Read now" : "Sign in") : "Preview"}
+            {canReadFree ? (isActive ? "Read now" : "Borrow first") : "Preview"}
           </span>
         </div>
       </div>
@@ -234,22 +245,9 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-[18px] bg-surface-elevated/50 ring-hairline transition-all hover:-translate-y-1 hover:bg-surface-high/50 hover:shadow-cinematic hover:ring-hairline-strong sm:rounded-xl">
-      {canReadFree ? (
-        user ? (
-          <BookReaderDialog book={book} index={index}>
-            {renderCardTrigger()}
-          </BookReaderDialog>
-        ) : (
-          renderCardTrigger({
-            onClick: handleReaderSignIn,
-            ariaLabel: `${book.title} sign in to open reader`,
-          })
-        )
-      ) : (
-        <BookPreviewDialog book={book} index={index} loanStatus={loanStatus}>
-          {renderCardTrigger()}
-        </BookPreviewDialog>
-      )}
+      <BookPreviewDialog book={book} index={index} loanStatus={loanStatus}>
+        {renderCardTrigger()}
+      </BookPreviewDialog>
 
       <div className="px-2.5 pb-2.5 sm:px-4 sm:pb-4">
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
@@ -289,36 +287,15 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
             </BookPreviewDialog>
           )}
 
-          {canReadFree ? (
-            user ? (
-              <Link
-                to={readerPath}
-                className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_40px_hsl(var(--primary)/0.5)] sm:h-9 sm:w-auto sm:px-3.5 sm:text-xs"
-              >
-                <BookOpen className="size-3.5" />
-                {primaryLabel}
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={handleReaderSignIn}
-                className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_40px_hsl(var(--primary)/0.5)] sm:h-9 sm:w-auto sm:px-3.5 sm:text-xs"
-              >
-                <BookOpen className="size-3.5" />
-                {primaryLabel}
-              </button>
-            )
-          ) : (
-            <button
-              type="button"
-              onClick={() => void handlePrimaryAction()}
-              disabled={busy || isRequested || !hasCanonicalBookId}
-              className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_40px_hsl(var(--primary)/0.5)] disabled:opacity-50 disabled:shadow-none sm:h-9 sm:w-auto sm:px-3.5 sm:text-xs"
-            >
-              {busy ? <Loader2 className="size-3.5 animate-spin" /> : <BookOpen className="size-3.5" />}
-              {primaryLabel}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => void handlePrimaryAction()}
+            disabled={busy || isRequested || !canBorrowFromCard}
+            className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_40px_hsl(var(--primary)/0.5)] disabled:opacity-50 disabled:shadow-none sm:h-9 sm:w-auto sm:px-3.5 sm:text-xs"
+          >
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <BookOpen className="size-3.5" />}
+            {primaryLabel}
+          </button>
         </div>
       </div>
     </article>

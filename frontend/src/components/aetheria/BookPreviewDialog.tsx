@@ -40,23 +40,17 @@ export const BookPreviewDialog = ({
   const { user } = useAuth();
   const previewSections = buildReadingSections(book).slice(0, 3);
   const canReadImmediately = canReadBookNow(book);
-  const canOpenReader = canReadImmediately || loanStatus === "active";
+  const canOpenReader = loanStatus === "active";
   const hasCanonicalBookId = isUuid(book.id);
   const statusLabel = getStatusLabel(loanStatus);
   const readerPath = getBookReaderPath(book);
   const readerActionPath = user ? readerPath : buildSignInPath(readerPath);
-  const readerActionLabel = user
-    ? loanStatus === "active"
-      ? "Read borrowed copy"
-      : "Open text reader"
-    : "Sign in to read";
+  const readerActionLabel = user ? "Read borrowed copy" : "Sign in to read";
   const accessHint =
     loanStatus === "active"
       ? "Tanii library-s unshina"
       : canReadImmediately
-        ? user
-          ? "Shuud unshij bolno"
-          : "Nevtreed unshina"
+        ? "Ehleed zeeleed unshina"
         : hasCanonicalBookId
           ? "Zeelej baij unshina"
           : "Preview-only catalog";
@@ -64,7 +58,7 @@ export const BookPreviewDialog = ({
     loanStatus === "active"
       ? "Borrowed reader"
       : canReadImmediately
-        ? "Free read"
+        ? "Borrow first"
         : hasCanonicalBookId
           ? "Library borrow"
           : "Preview only";
@@ -72,9 +66,7 @@ export const BookPreviewDialog = ({
     loanStatus === "active"
       ? "This title is already in your Library. Open the reader here or from My loans and continue inside Aetheria."
       : canReadImmediately
-        ? user
-          ? "This title is public-readable, so you can open it from the catalog without borrowing first."
-          : "This title becomes readable right after you sign in. Borrowing is not required."
+        ? "This public-readable title still needs to be borrowed first, then it opens in the in-site reader from your Library."
         : !hasCanonicalBookId
           ? "This title is currently shown as a local preview card only. Borrow and save actions are disabled until it is added to the database catalog."
           : book.available_copies > 0
