@@ -67,12 +67,18 @@ describe("library fallbacks", () => {
       },
     });
 
-    await expect(searchBooks("Austen", 5)).resolves.toEqual([
-      expect.objectContaining({
-        title: "Pride and Prejudice",
-        author: "Jane Austen",
-      }),
-    ]);
+    await expect(searchBooks("Austen", 5)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Pride and Prejudice",
+          author: "Jane Austen",
+        }),
+        expect.objectContaining({
+          title: "Sense and Sensibility",
+          author: "Jane Austen",
+        }),
+      ]),
+    );
   });
 
   it("falls back to built-in public books when public-readable rows cannot be queried", async () => {
@@ -94,6 +100,30 @@ describe("library fallbacks", () => {
 
     const expected = fallbackBooks.filter((book) => canReadBookNow(book)).slice(0, 3);
     await expect(fetchPublicReadableBooks(3)).resolves.toEqual(expected);
+  });
+
+  it("fills the public reader shelf from built-in books when hosted rows are sparse", async () => {
+    supabaseMocks.from.mockReturnValue({
+      select: vi.fn(() => ({
+        or: vi.fn(() => ({
+          order: vi.fn(() => ({
+            limit: vi.fn(async () => ({
+              data: [],
+              error: null,
+            })),
+          })),
+        })),
+      })),
+    });
+
+    await expect(fetchPublicReadableBooks(8)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Sense and Sensibility",
+          author: "Jane Austen",
+        }),
+      ]),
+    );
   });
 
   it("filters unreadable rows out of direct catalog results", async () => {

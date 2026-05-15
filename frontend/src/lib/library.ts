@@ -307,8 +307,8 @@ export const fetchPublicReadableBooks = async (limit = 8): Promise<Book[]> => {
 
     if (error) throw error;
 
-    const books = ((data ?? []) as Book[]).filter((book) => canReadBookNow(book)).slice(0, limit);
-    return books;
+    const books = ((data ?? []) as Book[]).filter((book) => canReadBookNow(book));
+    return mergeBooks(books, filterFallbackBooks("", limit, true), limit);
   } catch (error) {
     if (isRecoverableLibraryError(error)) {
       return filterFallbackBooks("", limit, true);
@@ -683,6 +683,19 @@ export const canReadBookNow = (book: Pick<Book, "title" | "author" | "reading_co
 export const buildReadingSections = (book: Book) => {
   if (book.reading_content?.length) {
     return book.reading_content;
+  }
+
+  const localizedSummary = book.description.trim() ||
+    "Энэ бүтээлийн metadata одоогоор товч байгаа ч үндсэн санаа нь судалгааны уншлагад чиглэсэн.";
+  const localizedLanguageLabel = book.language === "mn" ? "монгол" : "англи";
+  const localizedSections = [
+    `${book.title} бол ${book.genre.toLowerCase()} чиглэлийн ${localizedLanguageLabel} хэл дээрх бүтээл юм. ${localizedSummary}`,
+    `${book.author}-ын энэ бүтээлд уншигч тухайн сэдвийн үндсэн ухагдахуун, түүхэн нөхцөл, мөн архивын үнэ цэнийг нэг дороос харах боломжтой. Reader preview нь бүтээлийн агуулгад орохын өмнөх чиглүүлэгч танилцуулга болж өгнө.`,
+    "Хэрэв та энэ номыг цааш үргэлжлүүлэн судлах бол AI туслах дээрээс ижил төрлийн ном, тухайн genre-ийн бусад бүтээл, эсвэл гол санааг илүү энгийнээр тайлбарлуулж болно.",
+  ];
+
+  if (localizedSections.length) {
+    return localizedSections;
   }
 
   const languageLabel = book.language === "mn" ? "монгол" : "англи";

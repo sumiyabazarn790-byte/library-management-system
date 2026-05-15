@@ -46,6 +46,22 @@ describe("publicDomainBooks helpers", () => {
     ).toContain("books.google.com");
   });
 
+  it("maps newly added public-domain reader books to Gutenberg full-text candidates", () => {
+    expect(
+      getPublicDomainReaderUrl({
+        title: "The Art of War",
+        author: "Sun Tzu",
+      }),
+    ).toBe("https://www.gutenberg.org/ebooks/132");
+
+    expect(
+      getPublicDomainTextCandidates({
+        title: "The Hound of the Baskervilles",
+        author: "Arthur Conan Doyle",
+      })[0],
+    ).toContain("/2852/");
+  });
+
   it("returns null fallback sections for unmapped books", () => {
     expect(
       getPublicDomainFallbackSections({

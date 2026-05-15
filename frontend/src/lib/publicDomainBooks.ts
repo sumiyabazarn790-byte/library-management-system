@@ -79,6 +79,154 @@ const PUBLIC_DOMAIN_BOOKS: Record<string, PublicDomainBookRecord> = {
     ebookId: "345",
     readerUrl: "https://books.google.com/books?q=Dracula+Bram+Stoker&as_brr=1",
   },
+  "jane austen::sense and sensibility": {
+    ebookId: "161",
+    readerUrl: "https://www.gutenberg.org/ebooks/161",
+  },
+  "jane austen::emma": {
+    ebookId: "158",
+    readerUrl: "https://www.gutenberg.org/ebooks/158",
+  },
+  "jane austen::persuasion": {
+    ebookId: "105",
+    readerUrl: "https://www.gutenberg.org/ebooks/105",
+  },
+  "charles dickens::great expectations": {
+    ebookId: "1400",
+    readerUrl: "https://www.gutenberg.org/ebooks/1400",
+  },
+  "charles dickens::a tale of two cities": {
+    ebookId: "98",
+    readerUrl: "https://www.gutenberg.org/ebooks/98",
+  },
+  "charles dickens::oliver twist": {
+    ebookId: "730",
+    readerUrl: "https://www.gutenberg.org/ebooks/730",
+  },
+  "emily bronte::wuthering heights": {
+    ebookId: "768",
+    readerUrl: "https://www.gutenberg.org/ebooks/768",
+  },
+  "louisa may alcott::little women": {
+    ebookId: "514",
+    readerUrl: "https://www.gutenberg.org/ebooks/514",
+  },
+  "l. m. montgomery::anne of green gables": {
+    ebookId: "45",
+    readerUrl: "https://www.gutenberg.org/ebooks/45",
+  },
+  "kenneth grahame::the wind in the willows": {
+    ebookId: "289",
+    readerUrl: "https://www.gutenberg.org/ebooks/289",
+  },
+  "j. m. barrie::peter pan": {
+    ebookId: "16",
+    readerUrl: "https://www.gutenberg.org/ebooks/16",
+  },
+  "jack london::the call of the wild": {
+    ebookId: "215",
+    readerUrl: "https://www.gutenberg.org/ebooks/215",
+  },
+  "jack london::white fang": {
+    ebookId: "910",
+    readerUrl: "https://www.gutenberg.org/ebooks/910",
+  },
+  "jules verne::around the world in eighty days": {
+    ebookId: "103",
+    readerUrl: "https://www.gutenberg.org/ebooks/103",
+  },
+  "jules verne::twenty thousand leagues under the seas": {
+    ebookId: "164",
+    readerUrl: "https://www.gutenberg.org/ebooks/164",
+  },
+  "edwin a. abbott::flatland": {
+    ebookId: "201",
+    readerUrl: "https://www.gutenberg.org/ebooks/201",
+  },
+  "robert louis stevenson::the strange case of dr. jekyll and mr. hyde": {
+    ebookId: "43",
+    readerUrl: "https://www.gutenberg.org/ebooks/43",
+  },
+  "arthur conan doyle::the hound of the baskervilles": {
+    ebookId: "2852",
+    readerUrl: "https://www.gutenberg.org/ebooks/2852",
+  },
+  "arthur conan doyle::the memoirs of sherlock holmes": {
+    ebookId: "834",
+    readerUrl: "https://www.gutenberg.org/ebooks/834",
+  },
+  "wilkie collins::the moonstone": {
+    ebookId: "155",
+    readerUrl: "https://www.gutenberg.org/ebooks/155",
+  },
+  "wilkie collins::the woman in white": {
+    ebookId: "583",
+    readerUrl: "https://www.gutenberg.org/ebooks/583",
+  },
+  "henry james::the turn of the screw": {
+    ebookId: "209",
+    readerUrl: "https://www.gutenberg.org/ebooks/209",
+  },
+  "kate chopin::the awakening": {
+    ebookId: "160",
+    readerUrl: "https://www.gutenberg.org/ebooks/160",
+  },
+  "charlotte perkins gilman::the yellow wallpaper": {
+    ebookId: "1952",
+    readerUrl: "https://www.gutenberg.org/ebooks/1952",
+  },
+  "fyodor dostoyevsky::crime and punishment": {
+    ebookId: "2554",
+    readerUrl: "https://www.gutenberg.org/ebooks/2554",
+  },
+  "leo tolstoy::war and peace": {
+    ebookId: "2600",
+    readerUrl: "https://www.gutenberg.org/ebooks/2600",
+  },
+  "leo tolstoy::anna karenina": {
+    ebookId: "1399",
+    readerUrl: "https://www.gutenberg.org/ebooks/1399",
+  },
+  "homer::the odyssey": {
+    ebookId: "1727",
+    readerUrl: "https://www.gutenberg.org/ebooks/1727",
+  },
+  "sun tzu::the art of war": {
+    ebookId: "132",
+    readerUrl: "https://www.gutenberg.org/ebooks/132",
+  },
+  "marcus aurelius::meditations": {
+    ebookId: "2680",
+    readerUrl: "https://www.gutenberg.org/ebooks/2680",
+  },
+  "henry david thoreau::walden": {
+    ebookId: "205",
+    readerUrl: "https://www.gutenberg.org/ebooks/205",
+  },
+  "w. e. b. du bois::the souls of black folk": {
+    ebookId: "408",
+    readerUrl: "https://www.gutenberg.org/ebooks/408",
+  },
+  "frederick douglass::narrative of the life of frederick douglass": {
+    ebookId: "23",
+    readerUrl: "https://www.gutenberg.org/ebooks/23",
+  },
+  "harriet jacobs::incidents in the life of a slave girl": {
+    ebookId: "11030",
+    readerUrl: "https://www.gutenberg.org/ebooks/11030",
+  },
+  "oscar wilde::the importance of being earnest": {
+    ebookId: "844",
+    readerUrl: "https://www.gutenberg.org/ebooks/844",
+  },
+  "jacob grimm and wilhelm grimm::grimms' fairy tales": {
+    ebookId: "2591",
+    readerUrl: "https://www.gutenberg.org/ebooks/2591",
+  },
+  "hans christian andersen::andersen's fairy tales": {
+    ebookId: "1597",
+    readerUrl: "https://www.gutenberg.org/ebooks/1597",
+  },
 };
 
 const toPublicDomainBookKey = (book: Pick<Book, "title" | "author">) =>
