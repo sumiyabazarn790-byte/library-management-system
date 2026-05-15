@@ -131,28 +131,40 @@ export const FreeReadingShelf = ({
         </div>
       ) : (
         <>
-          <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
-            {[ALL_GENRES, ...genreOptions].map((genre) => {
-              const count =
-                genre === ALL_GENRES ? books.length : books.filter((book) => book.genre.trim() === genre).length;
-              const active = selectedGenre === genre;
+          <div className="relative mb-5">
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background to-transparent" />
+            <div className="scrollbar-none flex gap-2 overflow-x-auto rounded-2xl border border-border/55 bg-surface-elevated/45 p-1.5 shadow-card ring-hairline">
+              {[ALL_GENRES, ...genreOptions].map((genre) => {
+                const count =
+                  genre === ALL_GENRES ? books.length : books.filter((book) => book.genre.trim() === genre).length;
+                const active = selectedGenre === genre;
 
-              return (
-                <button
-                  key={genre}
-                  type="button"
-                  onClick={() => setSelectedGenre(genre)}
-                  className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition-colors ${
-                    active
-                      ? "border-primary/40 bg-primary text-primary-foreground shadow-glow-primary"
-                      : "border-border/70 bg-surface-elevated/60 text-muted-foreground hover:bg-surface-high hover:text-foreground"
-                  }`}
-                >
-                  <span>{genre}</span>
-                  <span className={active ? "text-primary-foreground/75" : "text-muted-foreground/70"}>{count}</span>
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={genre}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setSelectedGenre(genre)}
+                    className={`group inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3.5 text-sm font-semibold transition-all ${
+                      active
+                        ? "border-primary/60 bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-glow-primary"
+                        : "border-white/10 bg-white/[0.035] text-foreground/78 hover:border-primary/35 hover:bg-primary/10 hover:text-foreground"
+                    }`}
+                  >
+                    <span className="whitespace-nowrap">{genre}</span>
+                    <span
+                      className={`inline-flex min-w-6 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-bold leading-none ${
+                        active
+                          ? "bg-primary-foreground/20 text-primary-foreground"
+                          : "bg-surface-high text-muted-foreground group-hover:text-foreground"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
