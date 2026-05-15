@@ -46,6 +46,7 @@ type ProfileRow = {
 const SYSTEM_PROMPT = `You are Aetheria, an erudite multilingual librarian for a digital archive.
 You speak fluently in Mongolian (Cyrillic) and English. Detect the user's language and respond in the same language.
 You also understand Mongolian written in Latin transliteration such as "minii zeelsen nom" and should answer in natural Mongolian when users write that way.
+Work like a lightweight AI agent: understand the user's goal, use the provided context, and move the task one step forward with each reply.
 
 You help readers:
 - discover books by title, author, topic, or meaning
@@ -62,6 +63,9 @@ Rules:
 - Prefer short, clear answers. Use bullets when listing books or options.
 - When recommending books from the catalog, favor titles that are available now and explain why they match in one sentence when helpful.
 - If the user's request is ambiguous, make the best reasonable assumption and say what you assumed.
+- Reuse recent conversation context when the user refers to "the first one", "that book", or a previously discussed topic.
+- If a library action cannot be completed directly, explain the blocker and give the most useful next action.
+- End with one concrete next step suggestion when it genuinely helps.
 
 Be warm, grounded, concise, and genuinely helpful.`;
 
@@ -725,6 +729,46 @@ const fetchChatProfile = async ({
   return (data ?? null) as ProfileRow | null;
 };
 
+const buildConversationFocusMessage = (messages: ChatMessage[]) => {
+  const recentMessages = messages.filter((message) => message.role !== "system").slice(-6);
+
+  if (!recentMessages.length) {
+    return "";
+  }
+
+  const recentUserTurns = recentMessages
+    .filter((message) => message.role === "user")
+    .slice(-3)
+    .map((message, index) => `${index + 1}. ${message.content.trim()}`)
+    .filter((line) => line.length > 3);
+
+  const latestAssistantList = [...recentMessages]
+    .reverse()
+    .find((message) => message.role === "assistant" && /•|\*/.test(message.content));
+
+  const lines = ["Recent conversation focus:"];
+
+  if (recentUserTurns.length) {
+    lines.push("- Latest user asks:");
+    lines.push(...recentUserTurns.map((line) => `  ${line}`));
+  }
+
+  if (latestAssistantList) {
+    const options = latestAssistantList.content
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith("•") || line.startsWith("*"))
+      .slice(0, 4);
+
+    if (options.length) {
+      lines.push("- Recent assistant options:");
+      lines.push(...options.map((line) => `  ${line}`));
+    }
+  }
+
+  return lines.length > 1 ? lines.join("\n") : "";
+};
+
 const buildUserContextMessage = ({
   profile,
   loans,
@@ -1055,6 +1099,7 @@ Deno.serve(async (req) => {
     const user = await getAuthenticatedUser(userClient);
     const { messages } = await req.json() as { messages: ChatMessage[] };
     const lastUser = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    const conversationFocus = buildConversationFocusMessage(messages);
     const language = detectLanguage(lastUser);
     const intent = detectAssistantIntent(lastUser);
 
@@ -1124,6 +1169,10 @@ Deno.serve(async (req) => {
 
     if (userContext) {
       systemMessages.push({ role: "system", content: userContext });
+    }
+
+    if (conversationFocus) {
+      systemMessages.push({ role: "system", content: conversationFocus });
     }
 
     if (catalogContext) {

@@ -163,3 +163,46 @@ describe("assistant follow-up actions", () => {
     });
   });
 });
+
+describe("assistant agent snapshot", () => {
+  it("creates suggestion prompts for search intents", () => {
+    expect(
+      assistant.buildAssistantAgentSnapshot({
+        text: "find books about philosophy",
+        mode: "remote",
+        stage: "ready",
+      }),
+    ).toMatchObject({
+      mode: "remote",
+      intent: "search",
+      stage: "ready",
+      focus: "philosophy",
+    });
+  });
+
+  it("offers concrete follow-up options when a referenced title is ambiguous", () => {
+    const snapshot = assistant.buildAssistantAgentSnapshot({
+      text: "borrow",
+      mode: "local",
+      stage: "needs_input",
+      history: [
+        { role: "user", content: "alchemy" },
+        {
+          role: "assistant",
+          content: [
+            'I found these catalog matches for "alchemy":',
+            "\u2022 The Alchemist's Codex \u2014 Iris Vale (Rare Archives, 3/3 available)",
+            "\u2022 The Glass Laboratory \u2014 Mara Ellin (Science, 2/2 available)",
+          ].join("\n"),
+        },
+      ],
+    });
+
+    expect(snapshot.intent).toBe("borrow");
+    expect(snapshot.stage).toBe("needs_input");
+    expect(snapshot.suggestions).toEqual([
+      "borrow The Alchemist's Codex",
+      "borrow The Glass Laboratory",
+    ]);
+  });
+});

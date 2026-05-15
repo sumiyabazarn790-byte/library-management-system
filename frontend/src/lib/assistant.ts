@@ -36,10 +36,25 @@ export type AssistantConversationMessage = {
   content: string;
 };
 
+export type AssistantSuggestionPrompt = string;
+
+export type AssistantAgentMode = "local" | "remote" | "offline";
+
+export type AssistantAgentStage = "ready" | "working" | "needs_input" | "blocked";
+
+export type AssistantAgentState = {
+  mode: AssistantAgentMode;
+  intent: AssistantIntentKind | "startup";
+  stage: AssistantAgentStage;
+  focus?: string;
+  suggestions: AssistantSuggestionPrompt[];
+};
+
 export type LocalAssistantReply = {
   handled: boolean;
   reply?: string;
   shouldSignOut?: boolean;
+  agent?: AssistantAgentState;
 };
 
 const STALE_AUTH_SESSION_PATTERN =
@@ -535,6 +550,184 @@ const buildUnavailableReply = (language: AssistantLanguage, reason: string) =>
     ? `Одоогоор library backend холбогдохгүй байна: ${reason}`
     : `The library backend is unavailable right now: ${reason}`;
 
+const uniqueAssistantPrompts = (prompts: Array<string | undefined>, limit = 4) => {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+
+  for (const prompt of prompts) {
+    const normalized = prompt?.trim();
+
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+
+    seen.add(normalized);
+    unique.push(normalized);
+
+    if (unique.length >= limit) {
+      break;
+    }
+  }
+
+  return unique;
+};
+
+const buildActionPrompt = (
+  language: AssistantLanguage,
+  action: "borrow" | "request" | "return",
+  value: string,
+) => {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return "";
+  }
+
+  if (language === "mn") {
+    if (action === "borrow") return `zeeleh ${normalizedValue}`;
+    if (action === "request") return `zahialah ${normalizedValue}`;
+    return `butsaah ${normalizedValue}`;
+  }
+
+  return `${action} ${normalizedValue}`;
+};
+
+const buildSearchPrompt = (language: AssistantLanguage, value: string) => {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return "";
+  }
+
+  return language === "mn" ? `nom haih ${normalizedValue}` : `find books about ${normalizedValue}`;
+};
+
+const buildRecommendationPrompt = (language: AssistantLanguage, value: string) => {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return "";
+  }
+
+  return language === "mn" ? `sanal bolgo ${normalizedValue}` : `recommend books about ${normalizedValue}`;
+};
+
+const buildReadablePrompt = (language: AssistantLanguage) =>
+  language === "mn" ? "shuud unshih nom haruul" : "show books I can read now";
+
+const buildLoansPrompt = (language: AssistantLanguage) =>
+  language === "mn" ? "minii loans" : "show my loans";
+
+const buildDefaultAgentSuggestions = (language: AssistantLanguage) =>
+  uniqueAssistantPrompts([
+    buildSearchPrompt(language, "science fiction"),
+    buildRecommendationPrompt(language, language === "mn" ? "classic nom" : "classic literature"),
+    buildReadablePrompt(language),
+    buildLoansPrompt(language),
+  ]);
+
+const buildAgentSuggestions = ({
+  language,
+  intent,
+  query = "",
+  books = [],
+  loans = [],
+}: {
+  language: AssistantLanguage;
+  intent: AssistantIntentKind | "startup";
+  query?: string;
+  books?: Book[];
+  loans?: LoanWithBook[];
+}) => {
+  const firstBook = books[0];
+  const secondBook = books[1];
+  const firstActiveLoan = loans.find((loan) => loan.status === "active") ?? loans[0];
+  const focusGenre = firstBook?.genre || firstActiveLoan?.book.genre || query;
+
+  switch (intent) {
+    case "greeting":
+    case "capabilities":
+    case "startup":
+      return buildDefaultAgentSuggestions(language);
+    case "search":
+      return uniqueAssistantPrompts([
+        firstBook ? buildActionPrompt(language, "borrow", firstBook.title) : undefined,
+        secondBook ? buildActionPrompt(language, "request", secondBook.title) : undefined,
+        focusGenre ? buildRecommendationPrompt(language, focusGenre) : undefined,
+        buildReadablePrompt(language),
+      ]);
+    case "recommend":
+      return uniqueAssistantPrompts([
+        firstBook ? buildActionPrompt(language, "borrow", firstBook.title) : undefined,
+        secondBook ? buildActionPrompt(language, "request", secondBook.title) : undefined,
+        query ? buildSearchPrompt(language, query) : undefined,
+        buildReadablePrompt(language),
+      ]);
+    case "readable":
+      return uniqueAssistantPrompts([
+        firstBook ? buildSearchPrompt(language, firstBook.title) : undefined,
+        firstBook?.genre ? buildRecommendationPrompt(language, firstBook.genre) : undefined,
+        buildLoansPrompt(language),
+      ]);
+    case "loans":
+      return uniqueAssistantPrompts([
+        firstActiveLoan ? buildActionPrompt(language, "return", firstActiveLoan.book.title) : undefined,
+        firstActiveLoan?.book.genre ? buildRecommendationPrompt(language, firstActiveLoan.book.genre) : undefined,
+        buildReadablePrompt(language),
+      ]);
+    case "borrow":
+    case "request":
+      return uniqueAssistantPrompts([
+        buildLoansPrompt(language),
+        focusGenre ? buildRecommendationPrompt(language, focusGenre) : undefined,
+        buildReadablePrompt(language),
+      ]);
+    case "return":
+      return uniqueAssistantPrompts([
+        buildLoansPrompt(language),
+        focusGenre ? buildRecommendationPrompt(language, focusGenre) : undefined,
+        firstActiveLoan?.book.author ? buildSearchPrompt(language, firstActiveLoan.book.author) : undefined,
+      ]);
+    case "unknown":
+    default:
+      return buildDefaultAgentSuggestions(language);
+  }
+};
+
+const buildAgentState = ({
+  mode,
+  intent,
+  stage,
+  focus,
+  suggestions,
+}: {
+  mode: AssistantAgentMode;
+  intent: AssistantIntentKind | "startup";
+  stage: AssistantAgentStage;
+  focus?: string;
+  suggestions?: string[];
+}): AssistantAgentState => ({
+  mode,
+  intent,
+  stage,
+  focus: focus?.trim() || undefined,
+  suggestions: uniqueAssistantPrompts(suggestions ?? []),
+});
+
+const withAgentState = (
+  reply: LocalAssistantReply,
+  config: {
+    mode: AssistantAgentMode;
+    intent: AssistantIntentKind | "startup";
+    stage: AssistantAgentStage;
+    focus?: string;
+    suggestions?: string[];
+  },
+): LocalAssistantReply => ({
+  ...reply,
+  agent: buildAgentState(config),
+});
+
 const buildBookAccessHint = (book: Book, language: AssistantLanguage) => {
   if (canReadBookNow(book)) {
     return language === "mn" ? "\u0448\u0443\u0443\u0434 \u0443\u043d\u0448\u0438\u0436 \u0431\u043e\u043b\u043d\u043e" : "read now";
@@ -654,16 +847,22 @@ const buildReadableBooksReply = async (language: AssistantLanguage): Promise<Loc
   const books = await fetchPublicReadableBooks(6);
 
   if (!books.length) {
-    return {
+    return withAgentState({
       handled: true,
       reply:
         language === "mn"
           ? "\u041e\u0434\u043e\u043e\u0433\u043e\u043e\u0440 \u0448\u0443\u0443\u0434 \u0443\u043d\u0448\u0438\u0436 \u0431\u043e\u043b\u043e\u0445 \u043d\u043e\u043c \u043e\u043b\u0434\u0441\u043e\u043d\u0433\u04af\u0439."
           : "I could not find any on-site reader titles right now.",
-    };
+    }, {
+      mode: "local",
+      intent: "readable",
+      stage: "needs_input",
+      focus: "readable books",
+      suggestions: buildDefaultAgentSuggestions(language),
+    });
   }
 
-  return {
+  return withAgentState({
     handled: true,
     reply: [
       language === "mn"
@@ -674,7 +873,17 @@ const buildReadableBooksReply = async (language: AssistantLanguage): Promise<Loc
         ? "Catalog card-\u0430\u0430\u0441 \u043d\u044c reader-\u0438\u0439\u0433 \u0448\u0443\u0443\u0434 \u043d\u044d\u044d\u0436 \u0431\u043e\u043b\u043d\u043e."
         : "You can open any of them directly from the catalog reader button.",
     ].join("\n"),
-  };
+  }, {
+    mode: "local",
+    intent: "readable",
+    stage: "ready",
+    focus: books[0]?.title ?? "readable books",
+    suggestions: buildAgentSuggestions({
+      language,
+      intent: "readable",
+      books,
+    }),
+  });
 };
 
 const buildRecommendationReply = async ({
@@ -927,6 +1136,58 @@ const buildOfflineUnknownReply = (language: AssistantLanguage) =>
     ? "Одоогоор AI backend холбогдохгүй байна. Та номын нэр, зохиолч, эсвэл `миний loans` гэж асуувал би catalog талын тусламж үзүүлж чадна."
     : "The AI backend is unavailable right now. If you ask for a title, author, or say `my loans`, I can still help with catalog actions.";
 
+export const buildAssistantAgentSnapshot = ({
+  text,
+  history = [],
+  mode = "remote",
+  stage,
+}: {
+  text: string;
+  history?: AssistantConversationMessage[];
+  mode?: AssistantAgentMode;
+  stage?: AssistantAgentStage;
+}): AssistantAgentState => {
+  const language = detectAssistantLanguage(text);
+  const intent = detectAssistantIntent(text);
+  const canResolveActionFromHistory =
+    intent.kind === "borrow" || intent.kind === "request" || intent.kind === "return";
+  const shouldResolveFollowUpTarget =
+    canResolveActionFromHistory && (!intent.query || isReferentialFollowUpQuery(intent.query));
+  const followUpTarget =
+    shouldResolveFollowUpTarget
+      ? inferFollowUpTargetFromHistory({
+          text,
+          intentKind: intent.kind,
+          history,
+        })
+      : { query: "", options: [] as string[] };
+  const resolvedQuery = shouldResolveFollowUpTarget ? followUpTarget.query : intent.query || followUpTarget.query;
+
+  if (shouldResolveFollowUpTarget && !followUpTarget.query && followUpTarget.options.length > 1) {
+    const followUpAction = intent.kind === "request" ? "request" : intent.kind === "return" ? "return" : "borrow";
+
+    return buildAgentState({
+      mode,
+      intent: intent.kind,
+      stage: stage ?? "needs_input",
+      focus: text,
+      suggestions: followUpTarget.options.map((option) => buildActionPrompt(language, followUpAction, option)),
+    });
+  }
+
+  return buildAgentState({
+    mode,
+    intent: intent.kind,
+    stage: stage ?? (mode === "remote" ? "working" : intent.kind === "unknown" ? "needs_input" : "ready"),
+    focus: resolvedQuery || text,
+    suggestions: buildAgentSuggestions({
+      language,
+      intent: intent.kind,
+      query: resolvedQuery || text,
+    }),
+  });
+};
+
 export const resolveLocalAssistantReply = async ({
   text,
   userId,
@@ -956,7 +1217,9 @@ export const resolveLocalAssistantReply = async ({
       : { query: "", options: [] as string[] };
 
   if (shouldResolveFollowUpTarget && !followUpTarget.query && followUpTarget.options.length > 1) {
-    return {
+    const followUpAction = intent.kind === "request" ? "request" : intent.kind === "return" ? "return" : "borrow";
+
+    return withAgentState({
       handled: true,
       reply: [
         language === "mn"
@@ -964,7 +1227,13 @@ export const resolveLocalAssistantReply = async ({
           : "Please tell me which title you want:",
         ...followUpTarget.options.map((option) => `• ${option}`),
       ].join("\n"),
-    };
+    }, {
+      mode: "local",
+      intent: intent.kind,
+      stage: "needs_input",
+      focus: text,
+      suggestions: followUpTarget.options.map((option) => buildActionPrompt(language, followUpAction, option)),
+    });
   }
 
   const resolvedQuery = shouldResolveFollowUpTarget ? followUpTarget.query : intent.query || followUpTarget.query;
@@ -991,7 +1260,16 @@ export const resolveLocalAssistantReply = async ({
     case "unknown":
     default:
       if (forceOfflineFallback) {
-        return { handled: true, reply: buildOfflineUnknownReply(language) };
+        return withAgentState({
+          handled: true,
+          reply: buildOfflineUnknownReply(language),
+        }, {
+          mode: "offline",
+          intent: "unknown",
+          stage: "blocked",
+          focus: text,
+          suggestions: buildDefaultAgentSuggestions(language),
+        });
       }
 
       return { handled: false };
