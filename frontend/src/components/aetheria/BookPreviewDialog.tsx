@@ -40,11 +40,46 @@ export const BookPreviewDialog = ({
   const { user } = useAuth();
   const previewSections = buildReadingSections(book).slice(0, 3);
   const canReadImmediately = canReadBookNow(book);
+  const canOpenReader = canReadImmediately || loanStatus === "active";
   const hasCanonicalBookId = isUuid(book.id);
   const statusLabel = getStatusLabel(loanStatus);
   const readerPath = getBookReaderPath(book);
   const readerActionPath = user ? readerPath : buildSignInPath(readerPath);
-  const readerActionLabel = user ? "Open text reader" : "Sign in to read";
+  const readerActionLabel = user
+    ? loanStatus === "active"
+      ? "Read borrowed copy"
+      : "Open text reader"
+    : "Sign in to read";
+  const accessHint =
+    loanStatus === "active"
+      ? "Tanii library-s unshina"
+      : canReadImmediately
+        ? user
+          ? "Shuud unshij bolno"
+          : "Nevtreed unshina"
+        : hasCanonicalBookId
+          ? "Zeelej baij unshina"
+          : "Preview-only catalog";
+  const accessType =
+    loanStatus === "active"
+      ? "Borrowed reader"
+      : canReadImmediately
+        ? "Free read"
+        : hasCanonicalBookId
+          ? "Library borrow"
+          : "Preview only";
+  const accessDescription =
+    loanStatus === "active"
+      ? "This title is already in your Library. Open the reader here or from My loans and continue inside Aetheria."
+      : canReadImmediately
+        ? user
+          ? "This title is public-readable, so you can open it from the catalog without borrowing first."
+          : "This title becomes readable right after you sign in. Borrowing is not required."
+        : !hasCanonicalBookId
+          ? "This title is currently shown as a local preview card only. Borrow and save actions are disabled until it is added to the database catalog."
+          : book.available_copies > 0
+            ? "This title can be borrowed for free from the catalog."
+            : "This title is currently unavailable, so you can place a free request and borrow it once a copy returns.";
 
   return (
     <Dialog>
@@ -79,7 +114,7 @@ export const BookPreviewDialog = ({
               </div>
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Access</p>
-                <p className="mt-1 font-medium">Free</p>
+                <p className="mt-1 font-medium">{accessType}</p>
               </div>
             </div>
           </aside>
@@ -95,13 +130,7 @@ export const BookPreviewDialog = ({
             <div className="mt-4 flex flex-wrap gap-2 text-xs">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-primary">
                 <BookOpen className="size-3.5" />
-                {canReadImmediately
-                  ? user
-                    ? "Shuud unshij bolno"
-                    : "Nevtreed unshina"
-                  : hasCanonicalBookId
-                    ? "Zeelej baij unshina"
-                    : "Preview-only catalog"}
+                {accessHint}
               </span>
               {statusLabel ? (
                 <span className="inline-flex rounded-full bg-secondary-deep/30 px-3 py-1 text-secondary">
@@ -109,7 +138,7 @@ export const BookPreviewDialog = ({
                 </span>
               ) : null}
               <span className="inline-flex rounded-full bg-surface-high px-3 py-1 text-muted-foreground">
-                {canReadImmediately ? "Free read" : hasCanonicalBookId ? "Library borrow" : "Preview only"}
+                {accessType}
               </span>
             </div>
 
@@ -125,21 +154,13 @@ export const BookPreviewDialog = ({
 
             <div className="mt-4 rounded-2xl border border-secondary/20 bg-secondary-deep/10 p-4">
               <p className="text-sm font-semibold text-foreground">
-                {canReadImmediately ? "Reader access" : "Borrow access"}
+                {canOpenReader ? "Reader access" : "Borrow access"}
               </p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {canReadImmediately
-                  ? user
-                    ? "This title is public-readable, so you can open it from the catalog without borrowing first."
-                    : "This title becomes readable right after you sign in. Borrowing is not required."
-                  : !hasCanonicalBookId
-                    ? "This title is currently shown as a local preview card only. Borrow and save actions are disabled until it is added to the database catalog."
-                    : book.available_copies > 0
-                    ? "This title can be borrowed for free from the catalog."
-                    : "This title is currently unavailable, so you can place a free request and borrow it once a copy returns."}
+                {accessDescription}
               </p>
 
-              {canReadImmediately ? (
+              {canOpenReader ? (
                 <DialogClose asChild>
                   <Link
                     to={readerActionPath}

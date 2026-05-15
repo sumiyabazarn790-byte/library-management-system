@@ -59,7 +59,9 @@ const recoverableLibraryErrorPatterns = [
   /fetch failed/i,
   /network/i,
   /relation .*books/i,
+  /relation .*loans/i,
   /Could not find the table ['"]public\.books['"]/i,
+  /Could not find the table ['"]public\.loans['"]/i,
   /column .*is_public_readable/i,
   /column .*reading_content/i,
   /column .*borrow_price/i,
@@ -345,6 +347,36 @@ export const fetchBookById = async (bookId: string): Promise<Book | null> => {
   } catch (error) {
     if (isRecoverableLibraryError(error)) {
       return fallbackBook;
+    }
+
+    throw error;
+  }
+};
+
+export const fetchBorrowedBookById = async (userId: string, bookId: string): Promise<Book | null> => {
+  const normalizedBookId = decodeURIComponent(bookId.trim());
+
+  if (!userId || !isUuid(normalizedBookId) || shouldPreferFallbackData()) {
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("loans")
+      .select("book:books(*)")
+      .match({
+        user_id: userId,
+        book_id: normalizedBookId,
+        status: "active",
+      })
+      .maybeSingle();
+
+    if (error) throw error;
+
+    return ((data as { book: Book | null } | null)?.book ?? null) as Book | null;
+  } catch (error) {
+    if (isRecoverableLibraryError(error)) {
+      return null;
     }
 
     throw error;

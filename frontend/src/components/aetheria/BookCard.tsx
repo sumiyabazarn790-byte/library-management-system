@@ -43,7 +43,7 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
   const primaryLabel = useMemo(() => {
     if (canReadFree) return user ? "Read on site" : "Sign in to read";
     if (!hasCanonicalBookId) return "Preview only";
-    if (isActive) return "Borrowed";
+    if (isActive) return "Read";
     if (isRequested) return "Requested";
     return book.available_copies > 0 ? "Borrow" : "Request";
   }, [book.available_copies, canReadFree, hasCanonicalBookId, isActive, isRequested, user]);
@@ -115,6 +115,11 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
   };
 
   const handlePrimaryAction = async () => {
+    if (isActive) {
+      navigate(readerPath);
+      return;
+    }
+
     const nextBorrowMode = book.available_copies > 0 ? "borrow" : "request";
     await completeBorrowFlow(nextBorrowMode);
   };
@@ -307,7 +312,7 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
             <button
               type="button"
               onClick={() => void handlePrimaryAction()}
-              disabled={busy || isActive || isRequested || !hasCanonicalBookId}
+              disabled={busy || isRequested || !hasCanonicalBookId}
               className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_40px_hsl(var(--primary)/0.5)] disabled:opacity-50 disabled:shadow-none sm:h-9 sm:w-auto sm:px-3.5 sm:text-xs"
             >
               {busy ? <Loader2 className="size-3.5 animate-spin" /> : <BookOpen className="size-3.5" />}

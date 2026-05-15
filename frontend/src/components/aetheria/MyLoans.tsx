@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Check, Loader2 } from "lucide-react";
+import { BookOpen, Calendar, Check, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import type { LoanWithBook, SaleListing } from "@/types/library";
 import {
-  canReadBookNow,
   fetchLoans,
   fetchSaleListings,
   formatLibraryDate,
@@ -131,7 +130,6 @@ export const MyLoans = ({
             const overdue = loan.status === "active" && dueDate < new Date();
             const isRequested = loan.status === "requested";
             const activeListing = saleListingsByBook[loan.book_id] ?? null;
-            const hasReaderContent = canReadBookNow(loan.book);
             const hasDownloadSource = hasBookDownloadSource(loan.book);
 
             return (
@@ -187,24 +185,24 @@ export const MyLoans = ({
                         <DownloadBookButton book={loan.book} />
                       ) : null}
 
-                      {loan.status === "active" &&
-                        (hasReaderContent ? (
-                          <Link
-                            to={getBookReaderPath(loan.book)}
+                      {loan.status === "active" ? (
+                        <Link
+                          to={getBookReaderPath(loan.book)}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_32px_hsl(var(--primary)/0.38)]"
+                        >
+                          <BookOpen className="size-3.5" />
+                          Read borrowed copy
+                        </Link>
+                      ) : (
+                        <BookPreviewDialog book={loan.book} index={index} loanStatus={loan.status}>
+                          <button
+                            type="button"
                             className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/40 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
                           >
-                            Open text reader
-                          </Link>
-                        ) : (
-                          <BookPreviewDialog book={loan.book} index={index} loanStatus={loan.status}>
-                            <button
-                              type="button"
-                              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/40 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
-                            >
-                              Preview
-                            </button>
-                          </BookPreviewDialog>
-                        ))}
+                            Preview
+                          </button>
+                        </BookPreviewDialog>
+                      )}
 
                       {saleListingsFeatureEnabled && loan.status !== "requested" && (
                         <SellBookDialog loan={loan} existingListing={activeListing} onSubmitted={onLibraryChange} />

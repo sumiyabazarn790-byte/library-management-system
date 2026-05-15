@@ -26,7 +26,7 @@ vi.mock("@/integrations/supabase/availability", () => ({
   isLoopbackSupabaseUrl: false,
 }));
 
-import { canReadBookNow, fetchBookById, fetchPublicReadableBooks, searchBooks } from "./library";
+import { canReadBookNow, fetchBookById, fetchBorrowedBookById, fetchPublicReadableBooks, searchBooks } from "./library";
 
 describe("library fallbacks", () => {
   beforeEach(() => {
@@ -192,5 +192,48 @@ describe("library fallbacks", () => {
     });
 
     await expect(fetchBookById("3fa85f64-5717-4562-b3fc-2c963f66afa6")).resolves.toBeNull();
+  });
+
+  it("allows active borrowed books to load for the reader even without public text", async () => {
+    const borrowedBook = {
+      id: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      title: "The Midnight Library",
+      author: "Matt Haig",
+      genre: "Fiction",
+      description: "Borrowed reader copy.",
+      language: "en",
+      total_copies: 5,
+      available_copies: 4,
+      reading_content: null,
+    };
+    const maybeSingle = vi.fn(async () => ({
+      data: { book: borrowedBook },
+      error: null,
+    }));
+    const match = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ match }));
+
+    supabaseMocks.from.mockReturnValue({ select });
+
+    await expect(fetchBorrowedBookById("user-1", borrowedBook.id)).resolves.toEqual(borrowedBook);
+    expect(supabaseMocks.from).toHaveBeenCalledWith("loans");
+    expect(match).toHaveBeenCalledWith({
+      user_id: "user-1",
+      book_id: borrowedBook.id,
+      status: "active",
+    });
+  });
+
+  it("does not load a borrowed reader book without an active loan", async () => {
+    const maybeSingle = vi.fn(async () => ({
+      data: null,
+      error: null,
+    }));
+    const match = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ match }));
+
+    supabaseMocks.from.mockReturnValue({ select });
+
+    await expect(fetchBorrowedBookById("user-1", "3fa85f64-5717-4562-b3fc-2c963f66afa6")).resolves.toBeNull();
   });
 });

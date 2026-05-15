@@ -19,6 +19,7 @@ import {
   buildReadingSections,
   canReadBookNow,
   fetchBookById,
+  fetchBorrowedBookById,
   getPublicDomainReaderUrl,
   getPublicDomainTextApiPath,
   hasPublicDomainTextSource,
@@ -227,7 +228,8 @@ const Reader = () => {
       setErrorMessage("");
 
       try {
-        const nextBook = await fetchBookById(bookId);
+        const publicBook = await fetchBookById(bookId);
+        const nextBook = publicBook ?? (await fetchBorrowedBookById(user.id, bookId));
 
         if (!canceled) {
           if (!nextBook) {

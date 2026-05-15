@@ -3,7 +3,7 @@ import { BookOpen, Calendar, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Book, LoanWithBook } from "@/types/library";
-import { canReadBookNow, fetchLoans, formatLibraryDate, getBookReaderPath } from "@/lib/library";
+import { fetchLoans, formatLibraryDate, getBookReaderPath } from "@/lib/library";
 import { getBookCover } from "@/lib/bookCovers";
 import { scrollToSection } from "@/lib/navigation";
 import {
@@ -74,13 +74,13 @@ export const ContinueReading = ({ refreshKey }: { refreshKey?: number }) => {
 
       try {
         const progressItems = getReadingProgressEntries(user.id)
-          .filter((entry) => !entry.completed && canReadBookNow(entry.book))
+          .filter((entry) => !entry.completed)
           .map(toProgressItem);
         let loanItems: ContinueReadingItem[] = [];
 
         try {
           const loans = await fetchLoans(user.id, { statuses: ["active"], limit: 8 });
-          loanItems = loans.filter((loan) => canReadBookNow(loan.book)).map(toLoanItem);
+          loanItems = loans.map(toLoanItem);
         } catch (loanError) {
           console.warn("continue reading loan load failed", loanError);
         }
