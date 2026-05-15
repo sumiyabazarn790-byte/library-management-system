@@ -60,6 +60,7 @@ You help readers:
 Rules:
 - When using library or catalog context, never invent books, availability, due dates, or reader history that are not explicitly provided.
 - If the user asks a general knowledge question, you may answer it, but do not pretend it came from the archive.
+- For catalog discovery and recommendations, behave like a conversational ChatGPT-style assistant: explain tradeoffs, compare options, remember prior turns, and invite a useful next step.
 - Prefer short, clear answers. Use bullets when listing books or options.
 - When recommending books from the catalog, favor titles that are available now and explain why they match in one sentence when helpful.
 - If the user's request is ambiguous, make the best reasonable assumption and say what you assumed.
@@ -476,6 +477,19 @@ const pickBestBook = (books: CatalogBook[], query: string) =>
 const pickBestLoan = (loans: LoanRow[], query: string) =>
   [...loans].sort((left, right) => scoreBookCandidate(right.book, query) - scoreBookCandidate(left.book, query))[0] ?? null;
 
+const MODEL_FIRST_INTENTS = new Set<AssistantIntentKind>(["greeting", "capabilities", "search", "recommend"]);
+
+const shouldUseModelFirstForIntent = (intent: AssistantIntent, hasAiProvider: boolean) =>
+  hasAiProvider && MODEL_FIRST_INTENTS.has(intent.kind);
+
+const getCatalogContextQuery = (intent: AssistantIntent, fallbackText: string) => {
+  if ((intent.kind === "search" || intent.kind === "recommend") && intent.query.trim()) {
+    return intent.query.trim();
+  }
+
+  return fallbackText.trim();
+};
+
 const buildSearchReply = (query: string, books: CatalogBook[], language: AssistantLanguage) => {
   if (!books.length) {
     return language === "mn"
@@ -822,6 +836,46 @@ const buildCatalogContextMessage = (books: CatalogBook[]) => {
       .join("\n");
 };
 
+const buildModelTaskContextMessage = ({
+  intent,
+  language,
+  hasCatalogContext,
+}: {
+  intent: AssistantIntent;
+  language: AssistantLanguage;
+  hasCatalogContext: boolean;
+}) => {
+  const languageInstruction =
+    language === "mn"
+      ? "The user is writing in Mongolian or romanized Mongolian. Reply in natural Mongolian."
+      : "The user is writing in English. Reply in English.";
+  const lines = [
+    "Current assistant task:",
+    `- Detected intent: ${intent.kind}`,
+    `- Detected query: ${intent.query || "(none)"}`,
+    `- ${languageInstruction}`,
+  ];
+
+  if (intent.kind === "search" || intent.kind === "recommend") {
+    lines.push(
+      hasCatalogContext
+        ? "- Use the relevant catalog context as your source of truth for archive titles and availability."
+        : "- No relevant catalog context was found; be honest about that and suggest a better title, author, genre, or topic query.",
+      "- When you list catalog books, include title, author, why it fits, and whether the next action is read, borrow, or request.",
+      "- If the user seems ready to act, suggest an exact follow-up command such as `borrow <title>` or `request <title>`.",
+    );
+  } else if (intent.kind === "greeting" || intent.kind === "capabilities") {
+    lines.push(
+      "- Give a warm, concise assistant-style reply instead of a static menu.",
+      "- Mention that you can chat generally, recommend books, search the archive, and perform signed-in library actions.",
+    );
+  } else {
+    lines.push("- Answer naturally and use any supplied context only when it is relevant.");
+  }
+
+  return lines.join("\n");
+};
+
 const buildRecommendationReply = async ({
   serviceClient,
   userClient,
@@ -1102,8 +1156,10 @@ Deno.serve(async (req) => {
     const conversationFocus = buildConversationFocusMessage(messages);
     const language = detectLanguage(lastUser);
     const intent = detectAssistantIntent(lastUser);
+    const hasAiProvider = Boolean(openAiApiKey || lovableApiKey);
+    const shouldUseModelFirst = shouldUseModelFirstForIntent(intent, hasAiProvider);
 
-    if (intent.kind !== "unknown") {
+    if (intent.kind !== "unknown" && !shouldUseModelFirst) {
       try {
         const reply = await buildHandledReply({
           intent,
@@ -1126,27 +1182,31 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!openAiApiKey && !lovableApiKey) {
+    if (!hasAiProvider) {
       return jsonResponse({ reply: buildBackendUnavailableReply(language) });
     }
 
     let catalogContext = "";
     let userContext = "";
+    const shouldBuildCatalogContext = intent.kind === "search" || intent.kind === "recommend" || intent.kind === "unknown";
+    const catalogContextQuery = shouldBuildCatalogContext ? getCatalogContextQuery(intent, lastUser) : "";
 
-    try {
-      const books = await searchCatalogBooks({
-        supabase: serviceClient,
-        query: lastUser,
-        openAiApiKey,
-        openAiBaseUrl,
-        openAiQueryModel,
-        lovableApiKey,
-        limit: 8,
-      });
+    if (catalogContextQuery) {
+      try {
+        const books = await searchCatalogBooks({
+          supabase: serviceClient,
+          query: catalogContextQuery,
+          openAiApiKey,
+          openAiBaseUrl,
+          openAiQueryModel,
+          lovableApiKey,
+          limit: 8,
+        });
 
-      catalogContext = buildCatalogContextMessage(books);
-    } catch (error) {
-      console.warn("context build failed", error);
+        catalogContext = buildCatalogContextMessage(books);
+      } catch (error) {
+        console.warn("context build failed", error);
+      }
     }
 
     try {
@@ -1165,7 +1225,17 @@ Deno.serve(async (req) => {
       console.warn("user context build failed", error);
     }
 
-    const systemMessages: ChatMessage[] = [{ role: "system", content: SYSTEM_PROMPT }];
+    const systemMessages: ChatMessage[] = [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "system",
+        content: buildModelTaskContextMessage({
+          intent,
+          language,
+          hasCatalogContext: Boolean(catalogContext),
+        }),
+      },
+    ];
 
     if (userContext) {
       systemMessages.push({ role: "system", content: userContext });

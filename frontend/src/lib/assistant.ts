@@ -57,6 +57,15 @@ export type LocalAssistantReply = {
   agent?: AssistantAgentState;
 };
 
+type ResolveLocalAssistantReplyOptions = {
+  text: string;
+  userId?: string;
+  profile?: Profile | null;
+  history?: AssistantConversationMessage[];
+  forceOfflineFallback?: boolean;
+  preferRemoteDiscovery?: boolean;
+};
+
 const STALE_AUTH_SESSION_PATTERN =
   /user from sub claim in jwt does not exist|session from session_id claim in jwt does not exist|invalid refresh token|refresh token not found|loans_user_id_fkey|violates foreign key constraint ["']loans_user_id_fkey["']/i;
 
@@ -1194,15 +1203,12 @@ export const resolveLocalAssistantReply = async ({
   profile,
   history = [],
   forceOfflineFallback = false,
-}: {
-  text: string;
-  userId?: string;
-  profile?: Profile | null;
-  history?: AssistantConversationMessage[];
-  forceOfflineFallback?: boolean;
-}): Promise<LocalAssistantReply> => {
+  preferRemoteDiscovery = false,
+}: ResolveLocalAssistantReplyOptions): Promise<LocalAssistantReply> => {
   const language = detectAssistantLanguage(text);
   const intent = detectAssistantIntent(text);
+  const shouldLetRemoteModelHandleDiscovery =
+    preferRemoteDiscovery && !forceOfflineFallback && (intent.kind === "search" || intent.kind === "recommend");
   const canResolveActionFromHistory =
     intent.kind === "borrow" || intent.kind === "request" || intent.kind === "return";
   const shouldResolveFollowUpTarget =
@@ -1237,6 +1243,18 @@ export const resolveLocalAssistantReply = async ({
   }
 
   const resolvedQuery = shouldResolveFollowUpTarget ? followUpTarget.query : intent.query || followUpTarget.query;
+
+  if (shouldLetRemoteModelHandleDiscovery) {
+    return {
+      handled: false,
+      agent: buildAssistantAgentSnapshot({
+        text,
+        history,
+        mode: "remote",
+        stage: "working",
+      }),
+    };
+  }
 
   switch (intent.kind) {
     case "greeting":

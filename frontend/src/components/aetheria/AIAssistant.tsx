@@ -205,6 +205,7 @@ export const AIAssistant = () => {
         userId: user?.id,
         profile,
         history: nextMessages,
+        preferRemoteDiscovery: true,
       });
 
       if (localReply.handled) {

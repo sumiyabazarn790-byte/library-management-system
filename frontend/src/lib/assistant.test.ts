@@ -206,3 +206,20 @@ describe("assistant agent snapshot", () => {
     ]);
   });
 });
+
+describe("assistant remote discovery handoff", () => {
+  it("can let the cloud model answer search-style discovery prompts", async () => {
+    const reply = await assistant.resolveLocalAssistantReply({
+      text: "find books about ai ethics",
+      preferRemoteDiscovery: true,
+    });
+
+    expect(reply.handled).toBe(false);
+    expect(reply.agent).toMatchObject({
+      mode: "remote",
+      intent: "search",
+      stage: "working",
+      focus: "ai ethics",
+    });
+  });
+});
