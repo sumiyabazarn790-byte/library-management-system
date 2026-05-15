@@ -23,6 +23,11 @@ import {
   getPublicDomainTextApiPath,
   hasPublicDomainTextSource,
 } from "@/lib/library";
+import {
+  getReadingProgressForBook,
+  upsertReadingProgress,
+  type ReaderTextMode,
+} from "@/lib/readingProgress";
 import { cn } from "@/lib/utils";
 import type { Book } from "@/types/library";
 
@@ -30,8 +35,6 @@ type ReaderViewport = {
   width: number;
   height: number;
 };
-
-type ReaderTextMode = "original" | "mn";
 
 type PublicDomainTextResponse = {
   error?: string;
@@ -266,9 +269,12 @@ const Reader = () => {
       return;
     }
 
-    setReaderTextMode("mn");
-    setDisplayLanguage("mn");
-  }, [book]);
+    const savedProgress = user ? getReadingProgressForBook(user.id, book.id) : null;
+    const nextReaderTextMode = savedProgress?.readerTextMode ?? "mn";
+
+    setReaderTextMode(nextReaderTextMode);
+    setDisplayLanguage(nextReaderTextMode === "mn" ? "mn" : book.language);
+  }, [book, user]);
 
   useEffect(() => {
     if (!book) {
@@ -340,7 +346,9 @@ const Reader = () => {
 
   const publicDomainReaderUrl = book ? getPublicDomainReaderUrl(book) : null;
   const hasBuiltInReader = book ? canReadBookNow(book) : false;
-  const translationAvailable = Boolean(book && hasPublicDomainTextSource(book) && book.language !== "mn");
+  const hasLinkedTextSource = book ? hasPublicDomainTextSource(book) : false;
+  const isReaderTextLoading = Boolean(book && hasLinkedTextSource && fullTextLoading);
+  const translationAvailable = Boolean(book && hasLinkedTextSource && book.language !== "mn");
   const isShowingMongolianText = displayLanguage === "mn" || book?.language === "mn";
   const readerLayout = useMemo(
     () => getReaderLayout(viewport.width, viewport.height),
@@ -371,8 +379,18 @@ const Reader = () => {
   const canGoNext = safePageIndex < lastSpreadStart;
 
   useEffect(() => {
-    setPageIndex(0);
-  }, [book?.id, fullTextLoaded, readerTextMode]);
+    if (!book || !readerPages.length) {
+      setPageIndex(0);
+      return;
+    }
+
+    const savedProgress = user ? getReadingProgressForBook(user.id, book.id) : null;
+    const savedPageIndex =
+      savedProgress?.readerTextMode === readerTextMode ? savedProgress.pageIndex : 0;
+    const alignedPageIndex = Math.floor(Math.max(savedPageIndex, 0) / visiblePageCount) * visiblePageCount;
+
+    setPageIndex(Math.min(alignedPageIndex, lastSpreadStart));
+  }, [book, fullTextLoaded, fullTextLoading, lastSpreadStart, readerPages.length, readerTextMode, user, visiblePageCount]);
 
   useEffect(() => {
     setPageIndex((current) => {
@@ -381,6 +399,23 @@ const Reader = () => {
       return Math.min(aligned, lastSpreadStart);
     });
   }, [lastSpreadStart, readerPages.length, visiblePageCount]);
+
+  useEffect(() => {
+    if (!book || !user || !totalPages || isReaderTextLoading) {
+      return;
+    }
+
+    upsertReadingProgress(user.id, {
+      book,
+      pageIndex: safePageIndex,
+      totalPages,
+      progressPercent,
+      readerTextMode,
+      displayLanguage,
+      updatedAt: new Date().toISOString(),
+      completed: progressPercent >= 100,
+    });
+  }, [book, displayLanguage, isReaderTextLoading, progressPercent, readerTextMode, safePageIndex, totalPages, user]);
 
   useEffect(() => {
     if (typeof window === "undefined") {

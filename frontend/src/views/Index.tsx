@@ -8,6 +8,7 @@ import { Recommendations } from "@/components/aetheria/Recommendations";
 import { ContinueReading } from "@/components/aetheria/ContinueReading";
 import { UserProfilePanel } from "@/components/aetheria/UserProfilePanel";
 import { MyLoans } from "@/components/aetheria/MyLoans";
+import { SavedBooksShelf } from "@/components/aetheria/SavedBooksShelf";
 import { AdminPanel } from "@/components/aetheria/AdminPanel";
 import { CuratedCuriosities } from "@/components/aetheria/CuratedCuriosities";
 import { ArchiveSpotlight } from "@/components/aetheria/ArchiveSpotlight";
@@ -201,6 +202,7 @@ const Index = () => {
         return (
           <div className="space-y-12 md:space-y-16">
             <ContinueReading refreshKey={libraryRefreshKey} />
+            <SavedBooksShelf refreshKey={libraryRefreshKey} onLibraryChange={refreshLibrary} />
             <MyLoans refreshKey={libraryRefreshKey} onLibraryChange={refreshLibrary} />
           </div>
         );
