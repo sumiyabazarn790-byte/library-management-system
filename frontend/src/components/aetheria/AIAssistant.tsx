@@ -145,7 +145,17 @@ export const AIAssistant = () => {
   }, [messages, open]);
 
   useEffect(() => {
-    const handler = () => setOpen(true);
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<{ prompt?: string }>;
+      const prompt = customEvent.detail?.prompt?.trim();
+
+      if (prompt) {
+        setInput(prompt);
+      }
+
+      setOpen(true);
+    };
+
     window.addEventListener(AI_ASSISTANT_OPEN_EVENT, handler);
 
     return () => {

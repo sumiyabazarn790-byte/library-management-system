@@ -6,6 +6,7 @@ import { fetchLoanStatusesByBookIds, fetchSavedStatusesByBookIds, searchBooks } 
 import { useAuth } from "@/contexts/AuthContext";
 import { getBookCover } from "@/lib/bookCovers";
 import { cn } from "@/lib/utils";
+import { CATALOG_SEARCH_EVENT } from "@/lib/navigation";
 
 const genreDescriptions: Record<string, string> = {
   "Rare Archives": "Recovered manuscripts, sealed letters, and quiet artifacts from vanished institutions.",
@@ -95,6 +96,23 @@ export const Catalog = ({
       canceled = true;
     };
   }, [query, refreshKey, user]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleCatalogSearch = (event: Event) => {
+      const customEvent = event as CustomEvent<{ query?: string }>;
+      setQuery(customEvent.detail?.query?.trim() ?? "");
+    };
+
+    window.addEventListener(CATALOG_SEARCH_EVENT, handleCatalogSearch);
+
+    return () => {
+      window.removeEventListener(CATALOG_SEARCH_EVENT, handleCatalogSearch);
+    };
+  }, []);
 
   const genreGroups = results.reduce<Record<string, Book[]>>((groups, book) => {
     if (!groups[book.genre]) {

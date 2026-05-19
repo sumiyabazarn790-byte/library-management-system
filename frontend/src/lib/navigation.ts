@@ -1,6 +1,7 @@
 import { BookMarked, Compass, Home, Settings, Sparkles, type LucideIcon } from "lucide-react";
 
 export const AI_ASSISTANT_OPEN_EVENT = "aetheria:assistant-open";
+export const CATALOG_SEARCH_EVENT = "aetheria:catalog-search";
 export const SECTION_CHANGE_EVENT = "aetheria:section-change";
 
 export const navSections = [
@@ -30,15 +31,20 @@ export const scrollToSection = (id: string) => {
   element.scrollIntoView({ behavior: "smooth", block: "start" });
 };
 
-export const focusCatalogSearch = () => {
+export const focusCatalogSearch = (query = "") => {
   scrollToSection("browse");
   window.setTimeout(() => {
+    const nextQuery = query.trim();
+    if (nextQuery) {
+      window.dispatchEvent(new CustomEvent(CATALOG_SEARCH_EVENT, { detail: { query: nextQuery } }));
+    }
+
     const input = document.getElementById("catalog-search") as HTMLInputElement | null;
     input?.focus();
     input?.select();
   }, 350);
 };
 
-export const openAIAssistant = () => {
-  window.dispatchEvent(new CustomEvent(AI_ASSISTANT_OPEN_EVENT));
+export const openAIAssistant = (prompt = "") => {
+  window.dispatchEvent(new CustomEvent(AI_ASSISTANT_OPEN_EVENT, { detail: { prompt: prompt.trim() } }));
 };

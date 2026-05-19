@@ -1,13 +1,15 @@
-import { Eye } from "lucide-react";
+import { Eye, Search, Sparkles } from "lucide-react";
 import codex from "@/assets/book-codex.jpg";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { focusCatalogSearch, openAIAssistant } from "@/lib/navigation";
 
 export const ArchiveSpotlight = () => {
   const codexSrc = codex.src;
@@ -70,6 +72,28 @@ export const ArchiveSpotlight = () => {
                     The current build includes discovery, borrowing, AI guidance, and archive browsing
                     in a calmer reading-first layout.
                   </p>
+                  <div className="grid gap-3 pt-2 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
+                    <DialogClose asChild>
+                      <button
+                        type="button"
+                        onClick={() => focusCatalogSearch("Rare Archives")}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_32px_hsl(var(--primary)/0.42)]"
+                      >
+                        <Search className="size-3.5" />
+                        Browse archive books
+                      </button>
+                    </DialogClose>
+                    <DialogClose asChild>
+                      <button
+                        type="button"
+                        onClick={() => openAIAssistant("Help me explore archive manuscripts like Codex Leicester.")}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-4 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
+                      >
+                        <Sparkles className="size-3.5" />
+                        Ask AI
+                      </button>
+                    </DialogClose>
+                  </div>
                 </div>
               </div>
             </DialogContent>
