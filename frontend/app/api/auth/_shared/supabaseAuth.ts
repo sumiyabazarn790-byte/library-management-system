@@ -156,13 +156,16 @@ export const normalizePassword = (value: unknown) =>
 export const normalizeDisplayName = (value: unknown) =>
   typeof value === "string" ? value.trim() : "";
 
-const getAdminEmailAllowlist = () =>
-  new Set(
-    getEnv("ADMIN_EMAILS")
-      .split(/[,\n;]+/)
-      .map((value) => normalizeEmail(value))
-      .filter(Boolean),
-  );
+const DEFAULT_ADMIN_EMAILS = ["sumiyabazarn790@gmail.com"];
+
+const getAdminEmailAllowlist = () => {
+  const configuredEmails = getEnv("ADMIN_EMAILS")
+    .split(/[,\n;]+/)
+    .map((value) => normalizeEmail(value))
+    .filter(Boolean);
+
+  return new Set([...DEFAULT_ADMIN_EMAILS, ...configuredEmails]);
+};
 
 export const isAdminBootstrapEmail = (email: string) => {
   const normalizedEmail = normalizeEmail(email);
