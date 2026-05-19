@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { openAIAssistant, scrollToSection } from "@/lib/navigation";
 
 const columns = [
@@ -33,28 +32,44 @@ export const Footer = () => {
     event.preventDefault();
 
     const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) return;
-
-    setSubmitting(true);
-
-    const { error } = await supabase.from("newsletter_subscribers").insert({
-      email: normalizedEmail,
-      source: "footer",
-    });
-
-    setSubmitting(false);
-
-    if (error) {
-      if (error.code === "23505") {
-        toast.info("Энэ и-мэйл аль хэдийн бүртгэгдсэн байна.");
-      } else {
-        toast.error(error.message);
-      }
+    if (!normalizedEmail) {
+      toast.error("Please enter your email address.");
       return;
     }
 
-    setEmail("");
-    toast.success("Aetheria dispatch-д амжилттай бүртгэгдлээ.");
+    setSubmitting(true);
+
+    try {
+      const response = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+
+      const result = (await response.json().catch(() => null)) as {
+        error?: string | null;
+        status?: "subscribed" | "already_subscribed";
+      } | null;
+
+      if (!response.ok || result?.error) {
+        toast.error(result?.error || "Newsletter signup failed. Please try again.");
+        return;
+      }
+
+      setEmail("");
+
+      if (result?.status === "already_subscribed") {
+        toast.info("This email is already subscribed.");
+      } else {
+        toast.success("You are subscribed to the Aetheria dispatch.");
+      }
+    } catch {
+      toast.error("Newsletter signup failed. Check your connection and try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -95,7 +110,11 @@ export const Footer = () => {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="you@archive.com"
-              className="flex-1 h-11 px-4 rounded-md bg-surface-elevated border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary text-sm placeholder:text-muted-foreground/60 transition-colors"
+              autoComplete="email"
+              inputMode="email"
+              required
+              disabled={submitting}
+              className="flex-1 h-11 px-4 rounded-md bg-surface-elevated border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary text-sm placeholder:text-muted-foreground/60 transition-colors disabled:opacity-60"
             />
             <button
               type="submit"
