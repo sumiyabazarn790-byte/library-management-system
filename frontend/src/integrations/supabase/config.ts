@@ -1,6 +1,5 @@
-type SupabasePublicEnv = Pick<
-  NodeJS.ProcessEnv,
-  "NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" | "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+type SupabasePublicEnv = Partial<
+  Record<"NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" | "NEXT_PUBLIC_SUPABASE_ANON_KEY", string>
 >;
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);

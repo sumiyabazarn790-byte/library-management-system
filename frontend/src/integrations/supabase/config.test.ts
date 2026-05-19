@@ -7,7 +7,7 @@ describe("resolveSupabasePublicConfig", () => {
         NEXT_PUBLIC_SUPABASE_URL: "https://demo.supabase.co",
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "publishable-key",
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
-      } as NodeJS.ProcessEnv),
+      }),
     ).toEqual({
       url: "https://demo.supabase.co",
       publicKey: "publishable-key",
@@ -22,7 +22,7 @@ describe("resolveSupabasePublicConfig", () => {
       resolveSupabasePublicConfig({
         NEXT_PUBLIC_SUPABASE_URL: "https://demo.supabase.co",
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
-      } as NodeJS.ProcessEnv),
+      }),
     ).toEqual({
       url: "https://demo.supabase.co",
       publicKey: "anon-key",
@@ -37,7 +37,7 @@ describe("resolveSupabasePublicConfig", () => {
       resolveSupabasePublicConfig({
         NEXT_PUBLIC_SUPABASE_URL: "   ",
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "   ",
-      } as NodeJS.ProcessEnv),
+      }),
     ).toEqual({
       url: "",
       publicKey: "",
@@ -52,7 +52,7 @@ describe("resolveSupabasePublicConfig", () => {
       resolveSupabasePublicConfig({
         NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "publishable-key",
-      } as NodeJS.ProcessEnv),
+      }),
     ).toEqual({
       url: "http://127.0.0.1:54321",
       publicKey: "publishable-key",
@@ -67,7 +67,7 @@ describe("resolveSupabasePublicConfig", () => {
       resolveSupabasePublicConfig({
         NEXT_PUBLIC_SUPABASE_URL: "https://zqzfbksoryafdymzrord.supabase.co",
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tDHilTgQswgrwopphkumAA_k--8ExEN",
-      } as NodeJS.ProcessEnv),
+      }),
     ).toEqual({
       url: "https://origwdglnvvkilfuvrpa.supabase.co",
       publicKey: "sb_publishable_3FHQqosmVQiCDT46oHC17A_B19S8Arl",
@@ -82,7 +82,7 @@ describe("resolveSupabasePublicConfig", () => {
       resolveSupabasePublicConfig({
         NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tDHilTgQswgrwopphkumAA_k--8ExEN",
-      } as NodeJS.ProcessEnv),
+      }),
     ).toEqual({
       url: "http://127.0.0.1:54321",
       publicKey: "sb_publishable_tDHilTgQswgrwopphkumAA_k--8ExEN",
@@ -98,7 +98,7 @@ describe("resolveSupabasePublicConfig", () => {
         NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tDHilTgQswgrwopphkumAA_k--8ExEN",
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "local-anon-jwt",
-      } as NodeJS.ProcessEnv),
+      }),
     ).toEqual({
       url: "http://127.0.0.1:54321",
       publicKey: "local-anon-jwt",
@@ -113,7 +113,7 @@ describe("resolveSupabasePublicConfig", () => {
       resolveSupabasePublicConfig({
         NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "local-anon-jwt",
-      } as NodeJS.ProcessEnv),
+      }),
     ).toEqual({
       url: "http://127.0.0.1:54321",
       publicKey: "local-anon-jwt",
