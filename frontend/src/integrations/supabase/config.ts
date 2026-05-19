@@ -11,7 +11,6 @@ const STALE_HOSTED_SUPABASE_URLS = new Set([
   "https://zqzfbksoryafdymzrord.supabase.co",
 ]);
 const STALE_HOSTED_SUPABASE_PUBLIC_KEYS = new Set([
-  "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
   "sb_publishable_tDHilTgQswgrwopphkumAA_k--8ExEN",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxemZia3NvcnlhZmR5bXpyb3JkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5OTAwNjEsImV4cCI6MjA5MDU2NjA2MX0.qD2ut1ZeY2bVRrV6LQv3wlMauoRFvN3td6U1joM1q3A",
 ]);

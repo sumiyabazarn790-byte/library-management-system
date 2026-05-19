@@ -16,6 +16,7 @@ npm run db:restart
 npm run db:push      # Apply local backend migrations
 npm run db:link
 npm run db:push:linked
+npm run seed:admin   # Create/update the demo admin user
 npm run seed:books    # Seed demo book data
 ```
 
@@ -36,6 +37,11 @@ The demo data includes:
 - 3+ Mongolian books for localization testing
 - Mix of available and borrowed copies for realistic library states
 - Some books marked as public-readable for the public catalog feature
+
+Demo admin login:
+
+- Email: `admin@lumina.local`
+- Password: `LuminaAdmin123!`
 
 Notes:
 
