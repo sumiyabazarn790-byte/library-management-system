@@ -77,17 +77,17 @@ describe("resolveSupabasePublicConfig", () => {
     });
   });
 
-  it("repairs local loopback config when it is paired with a known hosted key", () => {
+  it("keeps local loopback config on loopback even when it is paired with a hosted key", () => {
     expect(
       resolveSupabasePublicConfig({
         NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tDHilTgQswgrwopphkumAA_k--8ExEN",
       } as NodeJS.ProcessEnv),
     ).toEqual({
-      url: "https://origwdglnvvkilfuvrpa.supabase.co",
-      publicKey: "sb_publishable_3FHQqosmVQiCDT46oHC17A_B19S8Arl",
+      url: "http://127.0.0.1:54321",
+      publicKey: "sb_publishable_tDHilTgQswgrwopphkumAA_k--8ExEN",
       hasConfig: true,
-      isLoopback: false,
+      isLoopback: true,
       publicKeyEnvName: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     });
   });

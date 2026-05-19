@@ -49,8 +49,7 @@ const resolveHostedProjectMigration = ({
   const isHostedUrl = Boolean(normalizedUrl) && !isLoopback;
   const shouldMigrate =
     STALE_HOSTED_SUPABASE_URLS.has(normalizedUrl) ||
-    (isHostedUrl && STALE_HOSTED_SUPABASE_PUBLIC_KEYS.has(publicKey)) ||
-    (isLoopback && isKnownHostedPublicKey(publicKey));
+    (isHostedUrl && STALE_HOSTED_SUPABASE_PUBLIC_KEYS.has(publicKey));
 
   if (!shouldMigrate) {
     return {
