@@ -9,11 +9,31 @@ import {
   LOCAL_SUPABASE_UNAVAILABLE_MESSAGE,
   markSupabaseUnavailable,
 } from './availability';
-import { hasSupabaseConfig, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./config";
+import {
+  hasSupabaseConfig,
+  isLoopbackHostname,
+  SUPABASE_PUBLISHABLE_KEY,
+  SUPABASE_URL,
+} from "./config";
 
 const FALLBACK_SUPABASE_URL = "https://placeholder.supabase.co";
 const FALLBACK_SUPABASE_PUBLISHABLE_KEY = "public-anon-key-placeholder";
+const LOCAL_DEV_SUPABASE_URL = "http://127.0.0.1:54321";
+const LOCAL_DEV_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
 const isBrowser = typeof window !== "undefined";
+const isLoopbackBrowser = isBrowser && isLoopbackHostname(window.location.hostname);
+const shouldForceLocalSupabase = isLoopbackBrowser && !isLoopbackSupabaseUrl;
+const resolvedSupabaseUrl = shouldForceLocalSupabase
+  ? LOCAL_DEV_SUPABASE_URL
+  : hasSupabaseConfig
+    ? SUPABASE_URL
+    : FALLBACK_SUPABASE_URL;
+const resolvedSupabaseKey = shouldForceLocalSupabase
+  ? LOCAL_DEV_SUPABASE_ANON_KEY
+  : hasSupabaseConfig
+    ? SUPABASE_PUBLISHABLE_KEY
+    : FALLBACK_SUPABASE_PUBLISHABLE_KEY;
 const authAvailableAtStartup = !isBrowser || !getSupabaseUnavailableReason();
 const OFFLINE_HINT =
   "Run `supabase start --workdir backend` or point frontend/.env.local at your cloud project.";
@@ -169,8 +189,8 @@ const supabaseFetch: typeof fetch = async (input, init) => {
 };
 
 export const supabase = createClient<Database>(
-  hasSupabaseConfig ? SUPABASE_URL : FALLBACK_SUPABASE_URL,
-  hasSupabaseConfig ? SUPABASE_PUBLISHABLE_KEY : FALLBACK_SUPABASE_PUBLISHABLE_KEY,
+  resolvedSupabaseUrl,
+  resolvedSupabaseKey,
   {
     global: {
       fetch: supabaseFetch,
