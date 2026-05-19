@@ -233,7 +233,7 @@ const Index = () => {
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <TopNav />
 
-      <main className="pt-16 overflow-x-hidden">
+      <main className="overflow-x-hidden pt-16 sm:pt-20">
         {!user ? (
           <div className="space-y-16 overflow-x-hidden md:space-y-24 lg:space-y-32">
             <Hero />

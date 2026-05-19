@@ -394,7 +394,7 @@ export const AIAssistant = () => {
       </button>
 
       {open && (
-        <div className="fixed bottom-0.5 right-0.5 z-50 flex h-[min(460px,calc(100vh-0.25rem))] w-[min(320px,calc(100vw-0.25rem))] flex-col overflow-hidden rounded-[18px] glass-strong ring-hairline-strong shadow-cinematic animate-fade-up sm:bottom-6 sm:right-6 sm:h-[min(720px,calc(100vh-3rem))] sm:w-[min(460px,calc(100vw-2rem))] sm:rounded-2xl">
+        <div className="fixed bottom-0 right-0 z-50 flex h-[min(560px,100dvh)] w-full flex-col overflow-hidden rounded-t-[18px] glass-strong ring-hairline-strong shadow-cinematic animate-fade-up sm:bottom-6 sm:right-6 sm:h-[min(720px,calc(100dvh-3rem))] sm:w-[min(460px,calc(100vw-2rem))] sm:rounded-2xl">
           <header className="flex h-10 items-center justify-between border-b border-border/40 px-2.5 sm:h-14 sm:px-5">
             <div className="flex items-center gap-1.5 sm:gap-2.5">
               <AssistantAvatar className="size-6 sm:size-9" />
@@ -454,7 +454,7 @@ export const AIAssistant = () => {
                 <div className={`flex items-end gap-1 sm:gap-2 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
                   {message.role === "assistant" ? <AssistantAvatar className="hidden size-8 shrink-0 sm:flex sm:size-9" /> : null}
                   <div
-                    className={`max-w-[96%] whitespace-pre-wrap rounded-2xl px-2 py-1.5 text-[11px] leading-[1.35rem] sm:max-w-[88%] sm:px-4 sm:py-3 sm:text-sm sm:leading-relaxed ${
+                    className={`max-w-[96%] break-words whitespace-pre-wrap rounded-2xl px-2 py-1.5 text-[11px] leading-[1.35rem] sm:max-w-[88%] sm:px-4 sm:py-3 sm:text-sm sm:leading-relaxed ${
                       message.role === "user"
                         ? "rounded-br-sm bg-primary text-primary-foreground"
                         : "rounded-bl-sm bg-surface-high text-foreground ring-hairline"

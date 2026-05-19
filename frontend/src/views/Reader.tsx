@@ -577,7 +577,7 @@ const Reader = () => {
               </div>
             </aside>
 
-            <div className="rounded-[32px] border border-border/50 bg-surface-elevated/80 p-4 shadow-cinematic sm:p-6 md:p-8">
+            <div className="min-w-0 rounded-[24px] border border-border/50 bg-surface-elevated/80 p-3 shadow-cinematic sm:rounded-[32px] sm:p-6 md:p-8">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="max-w-2xl">
                   <p className="text-xs uppercase tracking-[0.28em] text-primary/80">Aetheria Reader</p>
@@ -616,9 +616,9 @@ const Reader = () => {
 
                   <div className="space-y-3">
                     {translationAvailable ? (
-                      <div className="rounded-2xl border border-primary/20 bg-background/45 px-4 py-3 text-sm">
+                      <div className="rounded-2xl border border-primary/20 bg-background/45 px-3 py-3 text-sm sm:px-4">
                         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Text Language</p>
-                        <div className="mt-3 inline-flex rounded-full border border-border/70 bg-background/60 p-1">
+                        <div className="mt-3 grid grid-cols-2 rounded-full border border-border/70 bg-background/60 p-1">
                           <button
                             type="button"
                             onClick={() => setReaderTextMode("mn")}
@@ -673,7 +673,7 @@ const Reader = () => {
                 />
               ) : null}
 
-              <section className="mt-8 overflow-hidden rounded-[32px] border border-border/50 bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.08),transparent_36%),linear-gradient(180deg,rgba(10,15,19,0.8),rgba(9,13,17,0.96))] p-3 shadow-cinematic sm:p-5">
+              <section className="mt-8 overflow-hidden rounded-[24px] border border-border/50 bg-[radial-gradient(circle_at_top,hsl(var(--primary)/0.08),transparent_36%),linear-gradient(180deg,rgba(10,15,19,0.8),rgba(9,13,17,0.96))] p-2 shadow-cinematic sm:rounded-[32px] sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/8 pb-4">
                   <div>
                     <p className="text-xs uppercase tracking-[0.24em] text-primary/80">Book Pages</p>
@@ -693,7 +693,7 @@ const Reader = () => {
                     ) : null}
                   </div>
 
-                  <div className="min-w-[220px] rounded-2xl border border-white/8 bg-white/5 px-4 py-3">
+                  <div className="w-full min-w-0 rounded-2xl border border-white/8 bg-white/5 px-4 py-3 sm:w-auto sm:min-w-[220px]">
                     <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.22em] text-muted-foreground">
                       <span>
                         {totalPages ? `Pages ${currentPageStart}-${currentPageEnd}` : "No pages yet"}
@@ -722,12 +722,12 @@ const Reader = () => {
                         return (
                           <article
                             key={`${book.id}-page-${absolutePageNumber}`}
-                            className="relative overflow-hidden rounded-[28px] border border-[#d7c3a0]/70 bg-[linear-gradient(180deg,#fbf6ea_0%,#f5ecd7_100%)] px-5 py-6 text-stone-900 shadow-[0_30px_80px_rgba(0,0,0,0.26)] sm:px-8 sm:py-8"
+                            className="relative overflow-hidden rounded-[22px] border border-[#d7c3a0]/70 bg-[linear-gradient(180deg,#fbf6ea_0%,#f5ecd7_100%)] px-4 py-5 text-stone-900 shadow-[0_30px_80px_rgba(0,0,0,0.26)] sm:rounded-[28px] sm:px-8 sm:py-8"
                           >
                             <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-[linear-gradient(90deg,rgba(111,78,55,0.14),transparent)]" />
                             <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.95),transparent_70%)] opacity-80" />
 
-                            <div className="relative flex min-h-[56vh] flex-col sm:min-h-[62vh] lg:min-h-[66vh]">
+                            <div className="relative flex min-h-[58dvh] flex-col sm:min-h-[62dvh] lg:min-h-[66dvh]">
                               <div className="flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.28em] text-stone-500">
                                 <span className="truncate">{book.author}</span>
                                 <span>Page {absolutePageNumber}</span>
@@ -738,7 +738,7 @@ const Reader = () => {
                                   <p
                                     key={`${book.id}-page-${absolutePageNumber}-paragraph-${paragraphIndex}`}
                                     className={cn(
-                                      "text-[15px] leading-8 text-stone-800 sm:text-base",
+                                      "break-words text-[15px] leading-8 text-stone-800 sm:text-base",
                                       absolutePageNumber === 1 &&
                                         paragraphIndex === 0 &&
                                         "first-letter:float-left first-letter:mr-2 first-letter:mt-1 first-letter:font-display first-letter:text-4xl first-letter:leading-none sm:first-letter:text-5xl",
@@ -770,18 +770,18 @@ const Reader = () => {
                       ) : null}
                     </div>
 
-                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-white/8 bg-white/[0.03] p-3 sm:p-4">
+                    <div className="mt-5 grid gap-3 rounded-[24px] border border-white/8 bg-white/[0.03] p-3 sm:p-4 md:grid-cols-[1fr_auto_1fr] md:items-center">
                       <button
                         type="button"
                         onClick={handlePreviousPage}
                         disabled={!canGoPrevious}
-                        className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-foreground transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-45"
+                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-foreground transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:justify-self-start"
                       >
                         <ChevronLeft className="size-4" />
                         Previous {visiblePageCount === 2 ? "spread" : "page"}
                       </button>
 
-                      <div className="text-center">
+                      <div className="text-center md:order-none">
                         <p className="text-sm font-semibold text-foreground">
                           {totalPages
                             ? `Page ${currentPageStart}${currentPageEnd > currentPageStart ? `-${currentPageEnd}` : ""} of ${totalPages}`
@@ -794,7 +794,7 @@ const Reader = () => {
                         type="button"
                         onClick={handleNextPage}
                         disabled={!canGoNext}
-                        className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_36px_hsl(var(--primary)/0.42)] disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
+                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_36px_hsl(var(--primary)/0.42)] disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none md:w-auto md:justify-self-end"
                       >
                         Next {visiblePageCount === 2 ? "spread" : "page"}
                         <ChevronRight className="size-4" />

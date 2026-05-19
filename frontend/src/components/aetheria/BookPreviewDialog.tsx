@@ -77,8 +77,8 @@ export const BookPreviewDialog = ({
     <Dialog>
       <DialogTrigger asChild>{children}</DialogTrigger>
 
-      <DialogContent className="max-h-[calc(100vh-1rem)] w-[calc(100vw-1rem)] max-w-4xl overflow-hidden border-border/60 bg-surface-elevated p-0 text-foreground sm:max-h-[calc(100vh-3rem)]">
-        <div className="grid md:grid-cols-[260px_minmax(0,1fr)]">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-4xl overflow-hidden border-border/60 bg-surface-elevated p-0 text-foreground sm:max-h-[calc(100dvh-3rem)]">
+        <div className="grid max-h-[calc(100dvh-1rem)] overflow-y-auto md:grid-cols-[260px_minmax(0,1fr)] sm:max-h-[calc(100dvh-3rem)]">
           <aside className="hidden border-r border-border/50 bg-background/70 md:block">
             <img
               src={getBookCover(book, index)}
@@ -111,7 +111,7 @@ export const BookPreviewDialog = ({
             </div>
           </aside>
 
-          <div className="p-4 sm:p-6 md:p-7">
+          <div className="min-w-0 p-4 sm:p-6 md:p-7">
             <DialogHeader>
               <DialogTitle className="font-display text-2xl leading-tight">{book.title}</DialogTitle>
               <DialogDescription>
@@ -165,7 +165,7 @@ export const BookPreviewDialog = ({
               ) : null}
             </div>
 
-            <ScrollArea className="mt-6 h-[48vh] pr-2 sm:pr-4">
+            <ScrollArea className="mt-6 h-[min(42dvh,22rem)] pr-2 sm:h-[48dvh] sm:pr-4">
               <div className="space-y-4">
                 {previewSections.map((paragraph, paragraphIndex) => (
                   <p key={`${book.id}-preview-${paragraphIndex}`} className="text-sm leading-7 text-foreground/90">

@@ -145,7 +145,7 @@ export const Catalog = ({
 
       {!errorMessage && results.length > 0 && (
         <>
-          <div className="scrollbar-none mt-6 overflow-x-auto pb-2">
+          <div className="scrollbar-none -mx-4 mt-6 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
             <div className="flex min-w-max gap-4">
               {genres.map((genre, genreIndex) => {
                 const genreBooks = genreGroups[genre];
@@ -158,7 +158,7 @@ export const Catalog = ({
                     type="button"
                     onClick={() => setActiveGenre(genre)}
                     className={cn(
-                      "group relative w-[260px] overflow-hidden rounded-[28px] text-left transition-all sm:w-[300px] md:w-[320px]",
+                      "group relative w-[min(260px,78vw)] shrink-0 overflow-hidden rounded-[24px] text-left transition-all sm:w-[300px] sm:rounded-[28px] md:w-[320px]",
                       isActive ? "scale-[1.01]" : "hover:-translate-y-1",
                     )}
                     aria-pressed={isActive}
@@ -204,7 +204,7 @@ export const Catalog = ({
           </div>
 
           {selectedGenre ? (
-            <div className="mt-8 rounded-[30px] glass p-4 ring-hairline sm:p-6 md:p-7">
+            <div className="mt-8 rounded-[24px] glass p-3 ring-hairline sm:rounded-[30px] sm:p-6 md:p-7">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                   <p className="text-label uppercase tracking-[0.22em] text-primary/80">
@@ -221,7 +221,7 @@ export const Catalog = ({
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="mt-6 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
                 {selectedBooks.map((book, index) => (
                   <BookCard
                     key={book.id}

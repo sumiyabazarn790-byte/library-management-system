@@ -430,7 +430,7 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
               Миний Profile
             </h2>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs uppercase tracking-[0.26em] text-white/80">
+          <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs uppercase tracking-[0.18em] text-white/80 sm:tracking-[0.26em]">
             {isAdmin ? <Shield className="size-3.5 text-primary" /> : <Sparkles className="size-3.5 text-primary" />}
             <span>{isAdmin ? "Admin Account" : "Member Account"}</span>
           </div>
@@ -485,12 +485,12 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
                       onChange={(event) => void handleAvatarFile(event.target.files?.[0])}
                     />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm uppercase tracking-[0.26em] text-sky-200/80">Profile Signature</p>
-                    <h3 className="mt-2 font-display text-3xl font-semibold leading-none text-white md:text-5xl">
+                    <h3 className="mt-2 break-words font-display text-3xl font-semibold leading-tight text-white md:text-5xl">
                       {profileName}
                     </h3>
-                    <p className="mt-3 flex items-center gap-2 text-sm text-white/75">
+                    <p className="mt-3 flex min-w-0 items-center gap-2 text-sm text-white/75">
                       <Mail className="size-4 text-sky-300" />
                       <span className="truncate">{user.email}</span>
                     </p>
@@ -521,7 +521,7 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
 
                 <div className="max-w-2xl space-y-3">
                   <p className="text-sm uppercase tracking-[0.26em] text-sky-200/80">Reading DNA</p>
-                  <p className="text-base leading-7 text-white/88 md:text-xl md:leading-8">
+                  <p className="break-words text-base leading-7 text-white/88 md:text-xl md:leading-8">
                     {profileTagline}
                   </p>
                 </div>
@@ -590,7 +590,7 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
                     <p className={`text-sm font-semibold uppercase tracking-[0.28em] ${card.accentClass}`}>
                       {card.eyebrow}
                     </p>
-                    <h3 className="mt-3 font-display text-3xl font-semibold leading-tight text-white md:text-4xl">
+                    <h3 className="mt-3 break-words font-display text-3xl font-semibold leading-tight text-white md:text-4xl">
                       {card.title}
                     </h3>
                   </div>
@@ -619,7 +619,7 @@ export const UserProfilePanel = ({ onProfileChange, refreshKey }: UserProfilePan
                   Book card deer `Save` darsnaar end tani hadgalsan nomnuud shuud garj irne.
                 </p>
               ) : (
-                <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-5 2xl:grid-cols-3">
+                <div className="mt-6 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:gap-5 2xl:grid-cols-3">
                   {savedBooks.map((entry, index) => (
                     <BookCard
                       key={entry.id}

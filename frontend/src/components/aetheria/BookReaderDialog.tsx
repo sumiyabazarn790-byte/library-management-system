@@ -79,8 +79,8 @@ export const BookReaderDialog = ({
     <Dialog>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
 
-      <DialogContent className="max-w-4xl overflow-hidden border-border/60 bg-surface-elevated p-0 text-foreground">
-        <div className="grid md:grid-cols-[240px_minmax(0,1fr)]">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-4xl overflow-hidden border-border/60 bg-surface-elevated p-0 text-foreground sm:max-h-[calc(100dvh-3rem)]">
+        <div className="grid max-h-[calc(100dvh-1rem)] overflow-y-auto md:grid-cols-[240px_minmax(0,1fr)] sm:max-h-[calc(100dvh-3rem)]">
           <aside className="hidden flex-col border-r border-border/50 bg-background/70 md:flex">
             <img
               src={getBookCover(sourceBook, index)}
@@ -103,7 +103,7 @@ export const BookReaderDialog = ({
             </div>
           </aside>
 
-          <div className="p-6 md:p-7">
+          <div className="min-w-0 p-4 sm:p-6 md:p-7">
             <DialogHeader>
               <DialogTitle className="font-display text-2xl leading-tight">{sourceBook.title}</DialogTitle>
               <DialogDescription>
@@ -177,7 +177,7 @@ export const BookReaderDialog = ({
 
             <ReaderVoiceControls sections={readingSections} language={sourceBook.language} className="mt-4" />
 
-            <ScrollArea className="mt-6 h-[55vh] pr-4">
+            <ScrollArea className="mt-6 h-[min(45dvh,24rem)] pr-2 sm:h-[55dvh] sm:pr-4">
               <div className="space-y-5">
                 <div className="rounded-2xl border border-secondary/20 bg-secondary-deep/10 p-4">
                   <p className="text-sm font-semibold text-foreground">On-site text reader</p>

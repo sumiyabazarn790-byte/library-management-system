@@ -154,8 +154,8 @@ export const TopNav = () => {
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-md">
-      <nav className="mx-auto flex h-16 max-w-full items-center justify-between px-4 sm:h-20 sm:px-6 lg:px-12">
-        <Link to={user ? "/app#browse" : "/"} className="group flex items-center gap-3">
+      <nav className="mx-auto flex h-16 max-w-full items-center justify-between gap-2 px-4 sm:h-20 sm:px-6 lg:px-12">
+        <Link to={user ? "/app#browse" : "/"} className="group flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[radial-gradient(circle_at_22%_18%,hsl(var(--primary)/0.22),transparent_55%),radial-gradient(circle_at_78%_82%,hsl(var(--accent)/0.16),transparent_58%)] ring-1 ring-white/8 transition-all duration-300 group-hover:ring-primary/30 group-hover:shadow-[0_0_36px_hsl(var(--primary)/0.16)] sm:h-12 sm:w-12">
             <img src="/aetheria-mark.svg" alt="Aetheria logo" className="h-8 w-8 select-none sm:h-10 sm:w-10" draggable="false" />
           </div>
@@ -185,7 +185,7 @@ export const TopNav = () => {
           ))}
         </ul>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Sheet>
             <SheetTrigger asChild>
               <button
@@ -197,7 +197,7 @@ export const TopNav = () => {
             </SheetTrigger>
             <SheetContent
               side="left"
-              className="w-[min(22rem,calc(100vw-1rem))] border-border/60 bg-surface-elevated/95 p-0 text-foreground backdrop-blur-xl"
+              className="h-dvh w-[min(22rem,calc(100vw-1rem))] overflow-y-auto border-border/60 bg-surface-elevated/95 p-0 text-foreground backdrop-blur-xl"
             >
               <SheetHeader className="border-b border-border/50 px-5 py-5 text-left">
                 <SheetTitle className="font-display text-xl text-gradient-accent">AETHERIA</SheetTitle>
@@ -232,7 +232,7 @@ export const TopNav = () => {
 
                 <div className="rounded-2xl border border-border/50 bg-background/40 p-4">
                   <p className="text-xs uppercase tracking-[0.24em] text-primary/80">Quick actions</p>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-4 grid gap-3">
                     <SheetClose asChild>
                       <button
                         onClick={handleSearch}

@@ -22,14 +22,14 @@ export const SearchBar = ({ value, onChange, loading }: Props) => {
   return (
     <div className="relative group">
       <div className="absolute inset-0 bg-gradient-accent opacity-0 pointer-events-none rounded-xl blur-xl transition-opacity group-focus-within:opacity-30" />
-      <div className="relative flex h-14 items-center gap-3 rounded-xl glass-strong px-5 ring-hairline-strong transition-all group-focus-within:ring-1 group-focus-within:ring-primary/60">
+      <div className="relative flex min-h-12 items-center gap-2 rounded-xl glass-strong px-3 py-2 ring-hairline-strong transition-all group-focus-within:ring-1 group-focus-within:ring-primary/60 sm:h-14 sm:gap-3 sm:px-5 sm:py-0">
         <Search className="size-5 shrink-0 text-muted-foreground" strokeWidth={1.7} />
         <input
           id="catalog-search"
           value={local}
           onChange={(event) => setLocal(event.target.value)}
           placeholder="Search by title, author, genre, or meaning..."
-          className="flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted-foreground/70"
+          className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70 sm:text-[15px]"
         />
         {local && (
           <button

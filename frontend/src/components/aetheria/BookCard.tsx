@@ -182,7 +182,7 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
     <button
       type="button"
       onClick={options?.onClick}
-      className="flex flex-1 flex-col text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+      className="flex min-w-0 flex-1 flex-col text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
       aria-label={options?.ariaLabel ?? `${book.title} open preview`}
     >
       <div className="relative aspect-[3/4] overflow-hidden">
@@ -230,12 +230,12 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
         </p>
 
         <div className="mt-3 flex items-center justify-between gap-2 sm:mt-4 sm:gap-3">
-          <div className="space-y-1">
+          <div className="min-w-0 space-y-1">
             <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground sm:text-label">
               {book.available_copies}/{book.total_copies} available
             </span>
           </div>
-          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/80 sm:text-[11px] sm:tracking-[0.18em]">
+          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/80 sm:text-[11px] sm:tracking-[0.18em]">
             {canReadFree ? (isActive ? "Read now" : "Borrow first") : "Preview"}
           </span>
         </div>
@@ -294,7 +294,7 @@ export const BookCard = ({ book, index = 0, loanStatus = null, isSaved = false, 
             className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md bg-primary px-2 text-[11px] font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_40px_hsl(var(--primary)/0.5)] disabled:opacity-50 disabled:shadow-none sm:h-9 sm:w-auto sm:px-3.5 sm:text-xs"
           >
             {busy ? <Loader2 className="size-3.5 animate-spin" /> : <BookOpen className="size-3.5" />}
-            {primaryLabel}
+            <span className="truncate">{primaryLabel}</span>
           </button>
         </div>
       </div>

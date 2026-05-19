@@ -42,10 +42,10 @@ export const Hero = () => {
         style={{ animationDelay: "2s" }}
       />
 
-      <div className="relative z-10 flex min-h-[calc(100vh-4rem)] items-center px-4 py-20 sm:min-h-[680px] sm:px-6 sm:py-24 md:py-32 lg:px-12">
+      <div className="relative z-10 flex min-h-[calc(100dvh-4rem)] items-center px-4 py-16 sm:min-h-[calc(100dvh-5rem)] sm:px-6 sm:py-20 md:min-h-[680px] md:py-28 lg:px-12">
         <div className="mx-auto w-full max-w-[1440px]">
           <div className="grid items-center gap-10 md:grid-cols-2 md:gap-12 lg:gap-16">
-            <div className="max-w-2xl space-y-7 sm:space-y-8">
+            <div className="min-w-0 max-w-2xl space-y-7 sm:space-y-8">
               <div className="inline-flex flex-wrap items-center gap-3 animate-fade-in">
                 <div className="inline-flex items-center gap-2 rounded-full border border-secondary/30 bg-secondary-deep/50 px-4 py-2 text-sm font-medium backdrop-blur-sm">
                   <span className="size-2 animate-pulse-glow rounded-full bg-secondary" />
@@ -55,7 +55,7 @@ export const Hero = () => {
               </div>
 
               <div className="space-y-4 animate-fade-up" style={{ animationDelay: "0.1s" }}>
-                <h1 className="font-display text-4xl font-bold leading-tight sm:text-5xl md:text-6xl lg:text-7xl">
+                <h1 className="break-words font-display text-4xl font-bold leading-tight sm:text-5xl md:text-6xl lg:text-7xl">
                   <span className="block text-foreground">Unlock the</span>
                   <span className="block bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
                     Archives of Time
@@ -95,15 +95,15 @@ export const Hero = () => {
                 className="grid grid-cols-1 gap-4 border-t border-border/40 pt-8 animate-fade-up sm:grid-cols-3 sm:gap-6"
                 style={{ animationDelay: "0.4s" }}
               >
-                <div className="space-y-2 rounded-2xl border border-white/8 bg-black/15 p-4 backdrop-blur-sm sm:border-none sm:bg-transparent sm:p-0">
+                <div className="min-w-0 space-y-2 rounded-2xl border border-white/8 bg-black/15 p-4 backdrop-blur-sm sm:border-none sm:bg-transparent sm:p-0">
                   <div className="text-3xl font-bold text-primary">200+</div>
                   <p className="text-sm text-muted-foreground">Books & Manuscripts</p>
                 </div>
-                <div className="space-y-2 rounded-2xl border border-white/8 bg-black/15 p-4 backdrop-blur-sm sm:border-none sm:bg-transparent sm:p-0">
+                <div className="min-w-0 space-y-2 rounded-2xl border border-white/8 bg-black/15 p-4 backdrop-blur-sm sm:border-none sm:bg-transparent sm:p-0">
                   <div className="text-3xl font-bold text-accent">150+</div>
                   <p className="text-sm text-muted-foreground">Active Members</p>
                 </div>
-                <div className="space-y-2 rounded-2xl border border-white/8 bg-black/15 p-4 backdrop-blur-sm sm:border-none sm:bg-transparent sm:p-0">
+                <div className="min-w-0 space-y-2 rounded-2xl border border-white/8 bg-black/15 p-4 backdrop-blur-sm sm:border-none sm:bg-transparent sm:p-0">
                   <div className="text-3xl font-bold text-secondary">50+</div>
                   <p className="text-sm text-muted-foreground">Curated Collections</p>
                 </div>
