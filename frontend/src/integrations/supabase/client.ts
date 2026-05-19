@@ -22,8 +22,22 @@ const LOCAL_DEV_SUPABASE_URL = "http://127.0.0.1:54321";
 const LOCAL_DEV_SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
 const isBrowser = typeof window !== "undefined";
-const isLoopbackBrowser = isBrowser && isLoopbackHostname(window.location.hostname);
-const shouldForceLocalSupabase = isLoopbackBrowser && !isLoopbackSupabaseUrl;
+
+const isPrivateNetworkHostname = (hostname: string) => {
+  if (isLoopbackHostname(hostname)) {
+    return true;
+  }
+
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname) || /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+    return true;
+  }
+
+  const match = hostname.match(/^172\.(\d{1,2})\.\d{1,3}\.\d{1,3}$/);
+  return Boolean(match && Number(match[1]) >= 16 && Number(match[1]) <= 31);
+};
+
+const isLocalDevelopmentBrowser = isBrowser && isPrivateNetworkHostname(window.location.hostname);
+const shouldForceLocalSupabase = isLocalDevelopmentBrowser && !isLoopbackSupabaseUrl;
 const resolvedSupabaseUrl = shouldForceLocalSupabase
   ? LOCAL_DEV_SUPABASE_URL
   : hasSupabaseConfig

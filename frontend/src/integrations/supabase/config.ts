@@ -2,7 +2,7 @@ type SupabasePublicEnv = Partial<
   Record<"NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" | "NEXT_PUBLIC_SUPABASE_ANON_KEY", string>
 >;
 
-const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "0.0.0.0"]);
 const CURRENT_SUPABASE_URL = "https://origwdglnvvkilfuvrpa.supabase.co";
 const CURRENT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_3FHQqosmVQiCDT46oHC17A_B19S8Arl";
 const STALE_HOSTED_SUPABASE_URLS = new Set([
