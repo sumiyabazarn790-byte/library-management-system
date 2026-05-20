@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Calendar, Check, Loader2 } from "lucide-react";
+import { BookOpen, Calendar, Loader2, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,8 +9,8 @@ import {
   fetchLoans,
   fetchSaleListings,
   formatLibraryDate,
-  hasBookDownloadSource,
   getBookReaderPath,
+  hasBookDownloadSource,
   saleListingsFeatureEnabled,
   toFriendlyLibraryError,
 } from "@/lib/library";
@@ -68,6 +68,7 @@ export const MyLoans = ({
           console.error("loan load failed", error);
           setLoans([]);
           setSaleListings([]);
+          toast.error("Зээлсэн номын жагсаалт ачаалж чадсангүй.");
         }
       } finally {
         if (!canceled) {
@@ -82,9 +83,13 @@ export const MyLoans = ({
     };
   }, [refreshKey, user]);
 
-  const returnBook = async (loanId: string) => {
-    setBusyId(loanId);
-    const { error } = await supabase.rpc("return_book", { p_loan_id: loanId });
+  const returnBook = async (loan: LoanWithBook) => {
+    if (loan.status !== "active") {
+      return;
+    }
+
+    setBusyId(loan.id);
+    const { error } = await supabase.rpc("return_book", { p_loan_id: loan.id });
     setBusyId(null);
 
     if (error) {
@@ -92,15 +97,15 @@ export const MyLoans = ({
       return;
     }
 
-    toast.success("Ном амжилттай буцаагдлаа.");
-    setLoans((current) => current.filter((loan) => loan.id !== loanId));
+    setLoans((current) => current.filter((item) => item.id !== loan.id));
+    toast.success(`"${loan.book.title}" ном амжилттай буцаагдлаа.`);
     onLibraryChange?.();
   };
 
   if (!user) {
     return (
       <section className="rounded-2xl glass p-6 text-center ring-hairline sm:p-10">
-        <h3 className="text-headline-md">Зээлүүдээ харахын тулд нэвтэрнэ үү</h3>
+        <h3 className="text-headline-md">Зээлсэн номоо харахын тулд нэвтэрнэ үү</h3>
         <Link
           to="/auth"
           className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-glow-primary sm:w-auto"
@@ -113,15 +118,23 @@ export const MyLoans = ({
 
   return (
     <section>
-      <h2 className="mb-6 text-headline-md">Миний зээлүүд</h2>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-label uppercase tracking-[0.22em] text-primary/80">Library account</p>
+          <h2 className="mt-2 text-headline-md">Миний зээлүүд</h2>
+        </div>
+        <p className="max-w-md text-sm text-muted-foreground">
+          Идэвхтэй зээлсэн номоо эндээс уншиж, татаж эсвэл буцааж болно.
+        </p>
+      </div>
 
       {loading ? (
         <div className="py-10 text-center text-muted-foreground">
           <Loader2 className="inline size-5 animate-spin" />
         </div>
       ) : loans.length === 0 ? (
-        <p className="py-10 text-center text-muted-foreground">
-          Одоогоор зээл эсвэл захиалга алга. Каталогоос ном сонгоно уу.
+        <p className="rounded-2xl border border-dashed border-white/15 bg-surface-elevated/30 px-4 py-10 text-center text-muted-foreground">
+          Одоогоор зээл эсвэл захиалга алга. Каталогоос ном сонгоод зээлээрэй.
         </p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
@@ -131,6 +144,7 @@ export const MyLoans = ({
             const isRequested = loan.status === "requested";
             const activeListing = saleListingsByBook[loan.book_id] ?? null;
             const hasDownloadSource = hasBookDownloadSource(loan.book);
+            const isReturning = busyId === loan.id;
 
             return (
               <article
@@ -142,12 +156,13 @@ export const MyLoans = ({
                   alt={loan.book.title}
                   className="mx-auto h-40 w-28 rounded-md object-cover ring-hairline sm:mx-0 sm:h-28 sm:w-20"
                 />
+
                 <div className="min-w-0 flex-1">
                   <h3 className="line-clamp-2 font-display font-semibold leading-tight">{loan.book.title}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{loan.book.author}</p>
 
-                  <div className="mt-3 flex items-center gap-2 text-xs">
-                    <Calendar className="size-3.5 text-muted-foreground" />
+                  <div className="mt-3 flex items-start gap-2 text-xs">
+                    <Calendar className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
                     <span className={overdue ? "text-destructive" : "text-muted-foreground"}>
                       {isRequested
                         ? `Захиалсан: ${formatLibraryDate(loan.loaned_at)} · боломжтой болохыг хүлээж байна`
@@ -181,9 +196,7 @@ export const MyLoans = ({
                     </span>
 
                     <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                      {loan.status !== "requested" && hasDownloadSource ? (
-                        <DownloadBookButton book={loan.book} />
-                      ) : null}
+                      {loan.status !== "requested" && hasDownloadSource ? <DownloadBookButton book={loan.book} /> : null}
 
                       {loan.status === "active" ? (
                         <Link
@@ -191,7 +204,7 @@ export const MyLoans = ({
                           className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-glow-primary transition-all hover:shadow-[0_0_32px_hsl(var(--primary)/0.38)]"
                         >
                           <BookOpen className="size-3.5" />
-                          Read borrowed copy
+                          Унших
                         </Link>
                       ) : (
                         <BookPreviewDialog book={loan.book} index={index} loanStatus={loan.status}>
@@ -211,12 +224,12 @@ export const MyLoans = ({
                       {loan.status === "active" && (
                         <button
                           type="button"
-                          onClick={() => returnBook(loan.id)}
-                          disabled={busyId === loan.id}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/40 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
+                          onClick={() => void returnBook(loan)}
+                          disabled={isReturning}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/40 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {busyId === loan.id ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
-                          Буцаах
+                          {isReturning ? <Loader2 className="size-3 animate-spin" /> : <RotateCcw className="size-3" />}
+                          Ном буцаах
                         </button>
                       )}
                     </div>
